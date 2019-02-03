@@ -73,40 +73,30 @@ void Draw(screen* screen)
   vec3 colour(1.0,1.0,1.0);
 
   for(size_t s = 0; s<stars.size(); ++s){
-    vec3 color = 0.2f * vec3(1,1,1) / (stars[s].z*stars[s].z);
     u = f * (stars[s].x / stars[s].z) + (screen->width / 2);
     v = f * (stars[s].y / stars[s].z) + (screen->height / 2);
-    PutPixelSDL(screen, u, v, color);
+    std::cout << "u, v : " << stars[s].x << " " << stars[s].y << " " << stars[s].z << '\n';
+    PutPixelSDL(screen, u, v, colour);
   }
 
-      // uint32_t x = rand() % screen->width;
-      // uint32_t y = rand() % screen->height;
-      // PutPixelSDL(screen, x, y, colour);
+  /*for(int i=0; i<1000; i++)
+    {
+      uint32_t x = rand() % screen->width;
+      uint32_t y = rand() % screen->height;
+      PutPixelSDL(screen, x, y, colour);
+    }*/
 }
 
 /*Place updates of parameters here*/
 void Update()
 {
-  //static int t = SDL_GetTicks();
   /* Compute frame time */
   int t2 = SDL_GetTicks();
-  float dt = float(t2-t);
+  //float dt = float(t2-t);
   t = t2;
-
-  float velocity = 0.0001;
-
-  for(size_t s = 0; s < stars.size(); ++s){
-    /*update z position of stars*/
-    stars[s].z -= velocity*dt;
-
-    if(stars[s].z <= 0){
-      stars[s].z += 1;
-    }
-    if(stars[s].z > 1){
-      stars[s].z -= 1;
-    }
-  }
-
+  /*Good idea to remove this*/
+  //std::cout << "Render time: " << dt << " ms." << std::endl;
+  /* Update variables*/
 }
 
 void Interpolate( float a, float b, vector<float>& result){
@@ -125,7 +115,7 @@ void Interpolate( vec3 a, vec3 b, vector<vec3>& result){
   float step1 = (b.y - a.y) / (result.size()-1);
   float step2 = (b.z - a.z) / (result.size()-1);
 
-  for(size_t i = 0; i < result.size(); i++){
+  for(int i = 0; i < (int)result.size(); i++){
     result[i].x = a.x + i*step0;
     result[i].y = a.y + i*step1;
     result[i].z = a.z + i*step2;
