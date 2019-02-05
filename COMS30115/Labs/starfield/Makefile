@@ -17,7 +17,7 @@ CC=g++
 ########
 #       SDL options
 SDL_CFLAGS := $(shell sdl2-config --cflags)
-GLM_CFLAGS := -I../glm/
+GLM_CFLAGS := ../glm/
 SDL_LDFLAGS := $(shell sdl2-config --libs)
 
 ########
