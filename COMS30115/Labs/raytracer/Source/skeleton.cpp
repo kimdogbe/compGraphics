@@ -35,8 +35,8 @@ void Draw(screen* screen);
 int main( int argc, char* argv[] )
 {
 
-  /*fill vector of triangles*/
-  LoadTestModel(triangles );
+  /*fill vector with triangles from testModel*/
+  LoadTestModel(triangles);
 
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
 
@@ -92,7 +92,11 @@ bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles
     vec3 e1 = vec3(v1.x-v0.x,v1.y-v0.y,v1.z-v0.z);
     vec3 e2 = vec3(v2.x-v0.x,v2.y-v0.y,v2.z-v0.z);
     vec3 b = vec3(start.x-v0.x,start.y-v0.y,start.z-v0.z);
-    glm::mat3 A( -b, e1, e2 );
+    vec3 d;
+    d.x = dir.x;
+    d.y = dir.y;
+    d.z = dir.z;
+    glm::mat3 A( -d, e1, e2 );
     vec3 x = glm::inverse( A ) * b;
 
     if (x.y > 0 && x.z > 0 && x.x >= 0) {
