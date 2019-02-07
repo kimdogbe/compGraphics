@@ -69,8 +69,9 @@ void Draw(screen* screen)
 
   for(int y = 0; y < screen->height; y++){
     for(int x = 0; x < screen->width; x++){
-      vec4 start(x, y, -3, 1.0);
+      vec4 start(x, y, 0, 1.0);
       vec4 rayDir(x - SCREEN_WIDTH/2, y - SCREEN_HEIGHT/2, focalLength, 1.0);
+
       if(ClosestIntersection(start, rayDir, triangles, closestIntersection)){
         colour = triangles[closestIntersection.triangleIndex].color;
       }else{
