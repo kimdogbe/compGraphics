@@ -4,6 +4,7 @@
 #include "SDLauxiliary.h"
 #include "TestModelH.h"
 #include <stdint.h>
+#include "limits.h"
 
 using namespace std;
 using glm::vec3;
@@ -11,11 +12,11 @@ using glm::mat3;
 using glm::vec4;
 using glm::mat4;
 
+float m = std::numeric_limits<float>::max();
+
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 256
 #define FULLSCREEN_MODE false
-
-
 
 struct Intersection
 {
@@ -25,12 +26,16 @@ int triangleIndex;
 };
 
 vector<Triangle> triangles;
+float focalLength = 1.0f;
+vec4 cameraPos(0, 0, -3, 1.0);
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
 
 void Update();
 void Draw(screen* screen);
+bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles,
+   Intersection& closestIntersection );
 
 int main( int argc, char* argv[] )
 {
@@ -58,14 +63,30 @@ void Draw(screen* screen)
 {
   /* Clear buffer */
   memset(screen->buffer, 0, screen->height*screen->width*sizeof(uint32_t));
+  vec3 colour(0.0, 0.0, 0.0);
 
-  vec3 colour(1.0,0.0,0.0);
-  for(int i=0; i<1000; i++)
-    {
-      uint32_t x = rand() % screen->width;
-      uint32_t y = rand() % screen->height;
+  Intersection closestIntersection;
+
+  for(int y = 0; y < screen->height; y++){
+    for(int x = 0; x < screen->width; x++){
+      vec4 start(x, y, -3, 1.0);
+      vec4 rayDir(x - SCREEN_WIDTH/2, y - SCREEN_HEIGHT/2, focalLength, 1.0);
+      if(ClosestIntersection(start, rayDir, triangles, closestIntersection)){
+        colour = triangles[closestIntersection.triangleIndex].color;
+      }else{
+        colour = vec3(0.0, 0.0, 0.0);
+      }
       PutPixelSDL(screen, x, y, colour);
     }
+  }
+
+  /*vec3 colour(1.0,0.0,0.0);
+  for(int i=0; i<1000; i++)
+  {
+    uint32_t x = rand() % screen->width;
+    uint32_t y = rand() % screen->height;
+    PutPixelSDL(screen, x, y, colour);
+  }*/
 }
 
 /*Place updates of parameters here*/
@@ -99,8 +120,9 @@ bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles
     glm::mat3 A( -d, e1, e2 );
     vec3 x = glm::inverse( A ) * b;
 
-    if (x.y > 0 && x.z > 0 && x.x >= 0) {
-      closestIntersection.position = x.x * dir;
+     /*checking if point is within triangle*/
+    if (x.y > 0 && x.z > 0 && x.y + x.z < 1 && x.x >= 0) {
+      closestIntersection.position = start + (x.x * dir);
       closestIntersection.distance = x.x * dir.length();
       closestIntersection.triangleIndex = i;
       return true;
