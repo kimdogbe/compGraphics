@@ -26,8 +26,8 @@ int triangleIndex;
 };
 
 vector<Triangle> triangles;
-float focalLength = 1.0f;
-vec4 cameraPos(0, 0, -3, 1.0);
+float focalLength = SCREEN_WIDTH/2;
+vec4 cameraPos(0, 0, -3, focalLength);
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -70,9 +70,9 @@ void Draw(screen* screen)
   for(int y = 0; y < screen->height; y++){
     for(int x = 0; x < screen->width; x++){
       vec4 start(x, y, 0, 1.0);
-      vec4 rayDir(x - SCREEN_WIDTH/2, y - SCREEN_HEIGHT/2, focalLength, 1.0);
+      vec4 rayDir(x - screen->width/2, y - screen->height/2, focalLength, 1.0);
 
-      if(ClosestIntersection(start, rayDir, triangles, closestIntersection)){
+      if(ClosestIntersection(cameraPos, rayDir, triangles, closestIntersection)){
         colour = triangles[closestIntersection.triangleIndex].color;
       }else{
         colour = vec3(0.0, 0.0, 0.0);
@@ -107,6 +107,10 @@ void Update()
 bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles,
    Intersection& closestIntersection ){
 
+  bool inTriangle = false;
+  float m = std::numeric_limits<float>::max();
+  closestIntersection.distance = m;
+
   for(size_t i = 0; i < triangles.size(); i++){
     vec4 v0 = triangles[i].v0;
     vec4 v1 = triangles[i].v1;
@@ -122,12 +126,18 @@ bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles
     vec3 x = glm::inverse( A ) * b;
 
      /*checking if point is within triangle*/
+
     if (x.y > 0 && x.z > 0 && x.y + x.z < 1 && x.x >= 0) {
+      
       closestIntersection.position = start + (x.x * dir);
-      closestIntersection.distance = x.x * dir.length();
+      //closestIntersection.distance = x.x * dir.length();
+      /*might need refining by substracting start from it*/
+      closestIntersection.distance = sqrt(closestIntersection.position.x*closestIntersection.position.x +
+                                          closestIntersection.position.y*closestIntersection.position.y +
+                                          closestIntersection.position.z*closestIntersection.position.z);
       closestIntersection.triangleIndex = i;
-      return true;
+      inTriangle = true;
     }
   }
-  return false;
+  return inTriangle;
 }
