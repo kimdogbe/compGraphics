@@ -27,7 +27,7 @@ int triangleIndex;
 
 vector<Triangle> triangles;
 float focalLength = SCREEN_WIDTH/2;
-vec4 cameraPos(0, 0, -3, focalLength);
+vec4 cameraPos(0, 0, -2, focalLength);
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -125,18 +125,23 @@ bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles
     glm::mat3 A( -d, e1, e2 );
     vec3 x = glm::inverse( A ) * b;
 
-     /*checking if point is within triangle*/
+    vec4 currentPoint;
+    currentPoint.x = start.x + x.x*d.x;
+    currentPoint.y = start.y + x.x*d.y;
+    currentPoint.z = start.z + x.x*d.z;
+    float currentDistance = sqrt( currentPoint.x*currentPoint.x +
+                                  currentPoint.y*currentPoint.y +
+                                  currentPoint.z*currentPoint.z);
 
     if (x.y > 0 && x.z > 0 && x.y + x.z < 1 && x.x >= 0) {
-      
-      closestIntersection.position = start + (x.x * dir);
-      //closestIntersection.distance = x.x * dir.length();
-      /*might need refining by substracting start from it*/
-      closestIntersection.distance = sqrt(closestIntersection.position.x*closestIntersection.position.x +
-                                          closestIntersection.position.y*closestIntersection.position.y +
-                                          closestIntersection.position.z*closestIntersection.position.z);
-      closestIntersection.triangleIndex = i;
-      inTriangle = true;
+      if(closestIntersection.distance > currentDistance){
+        closestIntersection.position = currentPoint;
+        //closestIntersection.distance = x.x * dir.length();
+        /*might need refining by substracting start from it*/
+        closestIntersection.distance = currentDistance;
+        closestIntersection.triangleIndex = i;
+        inTriangle = true;
+      }
     }
   }
   return inTriangle;
