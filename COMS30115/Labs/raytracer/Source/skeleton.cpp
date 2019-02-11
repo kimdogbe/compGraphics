@@ -101,6 +101,35 @@ void Update()
   /*Good idea to remove this*/
   std::cout << "Render time: " << dt << " ms." << std::endl;
   /* Update variables*/
+
+  SDL_Event e;
+  while(SDL_PollEvent(&e))
+  {
+    if( e.type == SDLK_UP )
+    {
+      // Move camera forwards
+      cameraPos.z -= 1;
+      std::cout << "up pressed" << '\n';
+    }
+    if( e.type == SDLK_DOWN )
+    {
+      // Move camera backward
+      cameraPos.z += 1;
+      std::cout << "down pressed" << '\n';
+    }
+    if( e.type == SDLK_LEFT )
+    {
+      // Move camera to the left
+      cameraPos.x -= 1;
+      std::cout << "left pressed" << '\n';
+    }
+    if( e.type == SDLK_RIGHT )
+    {
+      // Move camera to the right
+      cameraPos.x += 1;
+      std::cout << "right pressed" << '\n';
+    }
+  }
 }
 
 // Start position of a ray, direction of the ray, triangles to check, return value if true
