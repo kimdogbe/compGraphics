@@ -14,8 +14,8 @@ using glm::mat4;
 
 float m = std::numeric_limits<float>::max();
 
-#define SCREEN_WIDTH 320
-#define SCREEN_HEIGHT 256
+#define SCREEN_WIDTH 100
+#define SCREEN_HEIGHT 60
 #define FULLSCREEN_MODE false
 
 struct Intersection
@@ -30,12 +30,17 @@ float focalLength = SCREEN_WIDTH/2;
 vec4 cameraPos(0, 0, -2, focalLength);
 
 /*camera rotation*/
+mat4 R;
+float yaw = 0;
+float pitch = 0;
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
 
 bool Update();
 void Draw(screen* screen);
+vec4 RotateCameraY(vec4 vectorRotate, float dYaw);
+vec4 RotateCameraX(vec4 vectorRotate, float dPitch);
 bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles,
    Intersection& closestIntersection );
 
@@ -91,6 +96,20 @@ void Draw(screen* screen)
   }*/
 }
 
+vec4 LookAt(vec4 target, vec4 cameraPos, vec4 dir){
+  vec4 diff = target - cameraPos;
+  vec4 normalDiff = normalize(diff);
+  float xRot = atan2(sqrt(diff.y * diff.y + diff.z * diff.z), diff.x);
+  std::cout<<xRot<<endl;
+  //float yRot = sin(normalDiff.x);
+  float yRot = atan2(sqrt(diff.x * diff.x + diff.z * diff.z), diff.y);
+  std::cout<<yRot<<endl;
+
+  dir = RotateCameraX(dir, xRot);
+  dir = RotateCameraY(dir, yRot);
+  return dir;
+}
+
 /*Place updates of parameters here*/
 bool Update()
 {
@@ -118,22 +137,20 @@ bool Update()
         case SDLK_UP:
           /* Move camera forward */
           cameraPos.z += 0.2f;
-          std::cout << "up pressed" << '\n';
           break;
         case SDLK_DOWN:
           /* Move camera backwards */
           cameraPos.z -= 0.2f;
-          std::cout << "down pressed" << '\n';
           break;
         case SDLK_LEFT:
           /* Move camera left */
           cameraPos.x -= 0.2f;
-          std::cout << "left pressed" << '\n';
+          yaw += 0.2f;
           break;
         case SDLK_RIGHT:
           /* Move camera right */
           cameraPos.x += 0.2f;
-          std::cout << "right pressed" << '\n';
+          yaw -= 0.2f;
           break;
         case SDLK_ESCAPE:
           /* Move camera quit */
@@ -144,9 +161,31 @@ bool Update()
   return true;
 }
 
+vec4 RotateCameraY(vec4 vectorRotate, float dYaw){
+  mat4 rot(cos(dYaw),0,sin(dYaw),0,
+           0,1,0,0,
+           -sin(dYaw),0,cos(dYaw),0,
+           0,0,0,1);
+
+  return rot*vectorRotate;
+}
+
+vec4 RotateCameraX(vec4 vectorRotate, float dPitch){
+  mat4 rot(1,0,0,0,
+           0,cos(dPitch),-sin(dPitch),0,
+           0,sin(dPitch),cos(dPitch), 0,
+           0,0,0,1);
+
+  return rot*vectorRotate;
+}
+
 // Start position of a ray, direction of the ray, triangles to check, return value if true
 bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles,
    Intersection& closestIntersection ){
+
+  //dir = RotateCameraY(dir, yaw);
+  vec4 targetView(0.5f,0.5f,1.5f,1.0f);
+  dir = LookAt(targetView, cameraPos, dir);
 
   bool inTriangle = false;
   float m = std::numeric_limits<float>::max();
