@@ -29,10 +29,12 @@ vector<Triangle> triangles;
 float focalLength = SCREEN_WIDTH/2;
 vec4 cameraPos(0, 0, -2, focalLength);
 
+/*camera rotation*/
+
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
 
-void Update();
+bool Update();
 void Draw(screen* screen);
 bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles,
    Intersection& closestIntersection );
@@ -45,9 +47,8 @@ int main( int argc, char* argv[] )
 
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
 
-  while( NoQuitMessageSDL() )
+  while( Update() )
     {
-      Update();
       Draw(screen);
       SDL_Renderframe(screen);
     }
@@ -91,10 +92,10 @@ void Draw(screen* screen)
 }
 
 /*Place updates of parameters here*/
-void Update()
+bool Update()
 {
-  static int t = SDL_GetTicks();
   /* Compute frame time */
+  static int t = SDL_GetTicks();
   int t2 = SDL_GetTicks();
   float dt = float(t2-t);
   t = t2;
@@ -105,31 +106,42 @@ void Update()
   SDL_Event e;
   while(SDL_PollEvent(&e))
   {
-    if( e.type == SDLK_UP )
+    if (e.type == SDL_QUIT)
     {
-      // Move camera forwards
-      cameraPos.z -= 1;
-      std::cout << "up pressed" << '\n';
+      return false;
     }
-    if( e.type == SDLK_DOWN )
+    else if (e.type == SDL_KEYDOWN)
     {
-      // Move camera backward
-      cameraPos.z += 1;
-      std::cout << "down pressed" << '\n';
-    }
-    if( e.type == SDLK_LEFT )
-    {
-      // Move camera to the left
-      cameraPos.x -= 1;
-      std::cout << "left pressed" << '\n';
-    }
-    if( e.type == SDLK_RIGHT )
-    {
-      // Move camera to the right
-      cameraPos.x += 1;
-      std::cout << "right pressed" << '\n';
+      int key_code = e.key.keysym.sym;
+      switch(key_code)
+        {
+        case SDLK_UP:
+          /* Move camera forward */
+          cameraPos.z += 0.2f;
+          std::cout << "up pressed" << '\n';
+          break;
+        case SDLK_DOWN:
+          /* Move camera backwards */
+          cameraPos.z -= 0.2f;
+          std::cout << "down pressed" << '\n';
+          break;
+        case SDLK_LEFT:
+          /* Move camera left */
+          cameraPos.x -= 0.2f;
+          std::cout << "left pressed" << '\n';
+          break;
+        case SDLK_RIGHT:
+          /* Move camera right */
+          cameraPos.x += 0.2f;
+          std::cout << "right pressed" << '\n';
+          break;
+        case SDLK_ESCAPE:
+          /* Move camera quit */
+          return false;
+      }
     }
   }
+  return true;
 }
 
 // Start position of a ray, direction of the ray, triangles to check, return value if true
@@ -158,16 +170,14 @@ bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles
     currentPoint.x = start.x + x.x*d.x;
     currentPoint.y = start.y + x.x*d.y;
     currentPoint.z = start.z + x.x*d.z;
-    float currentDistance = sqrt( currentPoint.x*currentPoint.x +
-                                  currentPoint.y*currentPoint.y +
-                                  currentPoint.z*currentPoint.z);
+    float currentDistance = x.x;
 
-    if (x.y > 0 && x.z > 0 && x.y + x.z < 1 && x.x >= 0) {
+    if (x.y >= 0 && x.z >= 0 && x.y + x.z <= 1 && x.x >= 0) {
       if(closestIntersection.distance > currentDistance){
         closestIntersection.position = currentPoint;
-        //closestIntersection.distance = x.x * dir.length();
+        closestIntersection.distance = x.x;
         /*might need refining by substracting start from it*/
-        closestIntersection.distance = currentDistance;
+        //closestIntersection.distance = currentDistance;
         closestIntersection.triangleIndex = i;
         inTriangle = true;
       }
