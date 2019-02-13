@@ -98,16 +98,30 @@ void Draw(screen* screen)
 
 vec4 LookAt(vec4 target, vec4 cameraPos, vec4 dir){
   vec4 diff = target - cameraPos;
-  vec4 normalDiff = normalize(diff);
-  float xRot = atan2(sqrt(diff.y * diff.y + diff.z * diff.z), diff.x);
-  std::cout<<xRot<<endl;
-  //float yRot = sin(normalDiff.x);
-  float yRot = atan2(sqrt(diff.x * diff.x + diff.z * diff.z), diff.y);
+  vec3 diff3(diff.x, diff.y, diff.z);
+  vec3 normalDiff = normalize(diff3);
+
+  vec3 unitVec(0,1,0);
+  vec3 right = cross(unitVec, normalDiff);
+  vec3 up = cross(normalDiff, right);
+
+  mat4 rot(right.x,      right.y,      right.z,      0,
+           up.x,         up.y,         up.z,         0,
+           normalDiff.x, normalDiff.y, normalDiff.z, 0,
+           cameraPos.x , cameraPos.y,  cameraPos.z,  1);
+
+  return rot*dir;
+
+  /*
+  xzDiff.y = 0;
+  xzDiff =  normalize(xzDiff);
+  float yRot = asin(xzDiff.x);
+  //float yRot = atan2(sqrt(normalDiff.x * normalDiff.x + normalDiff.z * normalDiff.z), normalDiff.y) - M_PI_2;
   std::cout<<yRot<<endl;
 
-  dir = RotateCameraX(dir, xRot);
-  dir = RotateCameraY(dir, yRot);
-  return dir;
+  //dir = RotateCameraX(dir, xRot);
+  dir = RotateCameraY(dir, yRot);*/
+  //return dir;
 }
 
 /*Place updates of parameters here*/
@@ -184,7 +198,7 @@ bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles
    Intersection& closestIntersection ){
 
   //dir = RotateCameraY(dir, yaw);
-  vec4 targetView(0.5f,0.5f,1.5f,1.0f);
+  vec4 targetView(0.5f,0.5f,0.5f,1.0f);
   dir = LookAt(targetView, cameraPos, dir);
 
   bool inTriangle = false;
