@@ -77,6 +77,7 @@ void Draw(screen* screen)
   vec3 colour(0.0, 0.0, 0.0);
 
   Intersection closestIntersection;
+  Intersection shadowIntersection;
 
   for(int y = 0; y < screen->height; y++){
     for(int x = 0; x < screen->width; x++){
@@ -84,8 +85,14 @@ void Draw(screen* screen)
       vec4 rayDir(x - screen->width/2, y - screen->height/2, focalLength, 1.0);
 
       if(ClosestIntersection(cameraPos, rayDir, triangles, closestIntersection)){
-        //colour = triangles[closestIntersection.triangleIndex].color;
-        colour = DirectLight(closestIntersection) * triangles[closestIntersection.triangleIndex].color;
+        vec4 shadowRay = normalize(lightPos - closestIntersection.position);
+        ClosestIntersection(closestIntersection.position + 0.01f*triangles[closestIntersection.triangleIndex].normal, shadowRay, triangles, shadowIntersection);
+        float surfaceToSurface = shadowIntersection.distance;
+        float surfaceToLight = length(closestIntersection.position - lightPos);
+        if (surfaceToSurface >= surfaceToLight) {
+          colour = DirectLight(closestIntersection) *
+           triangles[closestIntersection.triangleIndex].color;
+        } else colour = vec3(0.0, 0.0, 0.0);
       }else{
         colour = vec3(0.0, 0.0, 0.0);
       }
@@ -164,11 +171,11 @@ bool Update()
           break;
         case SDLK_a:
           /* Move light left */
-          lightPos.x += 0.2f;
+          lightPos.x -= 0.2f;
           break;
         case SDLK_d:
           /* Move light right */
-          lightPos.x -= 0.2f;
+          lightPos.x += 0.2f;
           break;
         case SDLK_q:
           /* Move light right */
