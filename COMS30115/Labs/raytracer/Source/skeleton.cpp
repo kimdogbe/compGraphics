@@ -34,6 +34,10 @@ mat4 R;
 float yaw = 0;
 float pitch = 0;
 
+/*illumination*/
+vec4 lightPos( 0, -0.5, -0.7, 1.0 );
+vec3 lightColor = 14.f * vec3( 1, 1, 1 );
+
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
 
@@ -43,6 +47,7 @@ vec4 RotateCameraY(vec4 vectorRotate, float dYaw);
 vec4 RotateCameraX(vec4 vectorRotate, float dPitch);
 bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles,
    Intersection& closestIntersection );
+vec3 DirectLight(const Intersection& i);
 
 int main( int argc, char* argv[] )
 {
@@ -79,7 +84,8 @@ void Draw(screen* screen)
       vec4 rayDir(x - screen->width/2, y - screen->height/2, focalLength, 1.0);
 
       if(ClosestIntersection(cameraPos, rayDir, triangles, closestIntersection)){
-        colour = triangles[closestIntersection.triangleIndex].color;
+        //colour = triangles[closestIntersection.triangleIndex].color;
+        colour = DirectLight(closestIntersection) * triangles[closestIntersection.triangleIndex].color;
       }else{
         colour = vec3(0.0, 0.0, 0.0);
       }
@@ -237,4 +243,13 @@ bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles
     }
   }
   return inTriangle;
+}
+
+vec3 DirectLight(const Intersection& i){
+  vec4 n = triangles[i.triangleIndex].normal;
+  vec4 r = lightPos - i.position;
+  float rLength = length(r);
+  float maxval = max(dot(normalize(r), n),0.0f);
+  vec3 direct = (lightColor * maxval) / (4.0f * (float)M_PI * rLength * rLength);
+  return direct;
 }
