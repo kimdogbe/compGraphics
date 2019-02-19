@@ -14,8 +14,8 @@ using glm::mat4;
 
 float m = std::numeric_limits<float>::max();
 
-#define SCREEN_WIDTH 100
-#define SCREEN_HEIGHT 60
+#define SCREEN_WIDTH 260
+#define SCREEN_HEIGHT 240
 #define FULLSCREEN_MODE false
 
 struct Intersection
@@ -154,6 +154,31 @@ bool Update()
       int key_code = e.key.keysym.sym;
       switch(key_code)
         {
+        case SDLK_w:
+          /* Move light forward */
+          lightPos.z += 0.2f;
+          break;
+        case SDLK_s:
+          /* Move light backwards */
+          lightPos.z -= 0.2f;
+          break;
+        case SDLK_a:
+          /* Move light left */
+          lightPos.x += 0.2f;
+          break;
+        case SDLK_d:
+          /* Move light right */
+          lightPos.x -= 0.2f;
+          break;
+        case SDLK_q:
+          /* Move light right */
+          lightPos.y += 0.2f;
+          break;
+        case SDLK_e:
+          /* Move light right */
+          lightPos.y -= 0.2f;
+          break;
+
         case SDLK_UP:
           /* Move camera forward */
           cameraPos.z += 0.2f;
