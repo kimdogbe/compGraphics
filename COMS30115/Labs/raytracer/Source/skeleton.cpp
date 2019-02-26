@@ -38,6 +38,8 @@ float pitch = 0;
 vec4 lightPos( 0, -0.5, -0.7, 1.0 );
 vec3 lightColor = 14.f * vec3( 1, 1, 1 );
 
+vec3 indirectLightColor = 0.23f * vec3(1,1,1);
+
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
 
@@ -89,10 +91,11 @@ void Draw(screen* screen)
         ClosestIntersection(closestIntersection.position + 0.01f*triangles[closestIntersection.triangleIndex].normal, shadowRay, triangles, shadowIntersection);
         float surfaceToSurface = shadowIntersection.distance;
         float surfaceToLight = length(closestIntersection.position - lightPos);
+        colour = indirectLightColor * triangles[closestIntersection.triangleIndex].color;
         if (surfaceToSurface >= surfaceToLight) {
-          colour = DirectLight(closestIntersection) *
+          colour += (DirectLight(closestIntersection)) *
            triangles[closestIntersection.triangleIndex].color;
-        } else colour = vec3(0.0, 0.0, 0.0);
+        }
       }else{
         colour = vec3(0.0, 0.0, 0.0);
       }
