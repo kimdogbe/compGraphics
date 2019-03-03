@@ -24,6 +24,8 @@ SDL_Event event;
 vector<Triangle> triangles;
 float focalLength = SCREEN_HEIGHT/2;
 vec4 cameraPos(0, 0, -3.001, 1);
+mat4 R;
+float yaw = 0;
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
 bool Update();
@@ -102,15 +104,19 @@ bool Update()
 	    switch(key_code)
 	      {
 	      case SDLK_UP:
+        cameraPos.z += 0.2f;
 		/* Move camera forward */
 		break;
 	      case SDLK_DOWN:
+        cameraPos.z -= 0.2f;
 		/* Move camera backwards */
 		break;
 	      case SDLK_LEFT:
+        cameraPos.x -= 0.2f;
 		/* Move camera left */
 		break;
 	      case SDLK_RIGHT:
+        cameraPos.x += 0.2f;
 		/* Move camera right */
 		break;
 	      case SDLK_ESCAPE:
@@ -152,7 +158,7 @@ void DrawLineSDL( screen* screen, ivec2 a, ivec2 b, vec3 color )
   std::vector<ivec2> line(pixels);
   Interpolate( a , b , line);
 
-  for(int i = 0; i < line.size(); ++i){
+  for(uint32_t i = 0; i < line.size(); ++i){
     PutPixelSDL( screen, line[i].x, line[i].y, color);
   }
 }
