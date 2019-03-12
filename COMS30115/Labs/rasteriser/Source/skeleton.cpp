@@ -41,12 +41,32 @@ void VertexShader( const vec4& v, ivec2& p );
 void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result );
 void DrawLineSDL( screen* screen, ivec2 a, ivec2 b, vec3 color );
 void DrawPolygonEdges( const vector<vec4>& vertices , screen* screen);
+void ComputePolygonRows(const vector<ivec2>& vertexPixels,
+                              vector <ivec2>& leftPixels,
+                              vector <ivec2>& rightPixels);
 
 int main( int argc, char* argv[] )
 {
   LoadTestModel(triangles);
 
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
+
+  vector<ivec2> vertexPixels(3);
+  vertexPixels[0] = ivec2(10, 5);
+  vertexPixels[1] = ivec2( 5,10);
+  vertexPixels[2] = ivec2(15,15);
+  vector<ivec2> leftPixels;
+  vector<ivec2> rightPixels;
+  ComputePolygonRows( vertexPixels, leftPixels, rightPixels );
+  for( uint row=0; row<leftPixels.size(); ++row )
+  {
+  cout << "Start: ("
+  << leftPixels[row].x << ","
+  << leftPixels[row].y << "). "
+  << "End: ("
+  << rightPixels[row].x << ","
+  << rightPixels[row].y << "). " << endl;
+  }
 
   while ( Update())
     {
@@ -151,6 +171,52 @@ bool Update()
 	  }
     }
   return true;
+}
+void ComputePolygonRows(const vector<ivec2>& vertexPixels,
+                              vector <ivec2>& leftPixels,
+                              vector <ivec2>& rightPixels) {
+  // Compute number of rows required
+  int minY =  numeric_limits<int>::max();
+  int maxY = -numeric_limits<int>::max();
+  for (uint i = 0; i < vertexPixels.size(); ++i) {
+    if (vertexPixels[i].y > maxY) maxY = vertexPixels[i].y;
+    if (vertexPixels[i].y < minY) minY = vertexPixels[i].y;
+  }
+  // Resize vectors to approporiate number of rows
+  uint numRows = maxY - minY + 1;
+  leftPixels = vector<ivec2>(numRows);
+  rightPixels = vector<ivec2>(numRows);
+  // Init left and rightPixels vectors
+  for( uint i = 0; i<numRows; ++i )
+  {
+    leftPixels[i].x = +numeric_limits<int>::max();
+    rightPixels[i].x = -numeric_limits<int>::max();
+  }
+  for (uint i = 0; i < vertexPixels.size(); ++i) {
+    // Take all edges of the polygon
+    ivec2 firstVertex = vertexPixels[i];
+    ivec2 secondVertex = vertexPixels[(i+1) % vertexPixels.size()];
+    // Interpolate 1 result for each row
+    int edgeHeight = abs(firstVertex.y - secondVertex.y) + 1;
+    int startingY = firstVertex.y;
+    int direction;
+    if (firstVertex.y < secondVertex.y) direction = 1;
+    else  direction = -1;
+    vector<ivec2> interpolationResults = vector<ivec2>(edgeHeight);
+    Interpolate(firstVertex, secondVertex, interpolationResults);
+
+    for (int j = 0; j < edgeHeight; j++) {
+      int currentY = startingY + (j * direction) - minY;
+      if (interpolationResults[j].x < leftPixels[currentY].x) {
+        leftPixels[currentY].x = interpolationResults[j].x;
+        leftPixels[currentY].y = interpolationResults[j].y;
+      }
+      if (interpolationResults[j].x > rightPixels[currentY].x) {
+        rightPixels[currentY].x = interpolationResults[j].x;
+        rightPixels[currentY].y = interpolationResults[j].y;
+      }
+    }
+  }
 }
 
 void TransformationMatrix()
