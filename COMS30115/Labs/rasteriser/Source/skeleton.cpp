@@ -44,29 +44,17 @@ void DrawPolygonEdges( const vector<vec4>& vertices , screen* screen);
 void ComputePolygonRows(const vector<ivec2>& vertexPixels,
                               vector <ivec2>& leftPixels,
                               vector <ivec2>& rightPixels);
+void DrawRows(screen* screen,
+              const vector<ivec2>& leftPixels,
+              const vector<ivec2>& rightPixels,
+              vec3 colour );
+void DrawPolygon(screen* screen,  const vector<vec4>& vertices, vec3 colour );
 
 int main( int argc, char* argv[] )
 {
   LoadTestModel(triangles);
 
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
-
-  vector<ivec2> vertexPixels(3);
-  vertexPixels[0] = ivec2(10, 5);
-  vertexPixels[1] = ivec2( 5,10);
-  vertexPixels[2] = ivec2(15,15);
-  vector<ivec2> leftPixels;
-  vector<ivec2> rightPixels;
-  ComputePolygonRows( vertexPixels, leftPixels, rightPixels );
-  for( uint row=0; row<leftPixels.size(); ++row )
-  {
-  cout << "Start: ("
-  << leftPixels[row].x << ","
-  << leftPixels[row].y << "). "
-  << "End: ("
-  << rightPixels[row].x << ","
-  << rightPixels[row].y << "). " << endl;
-  }
 
   while ( Update())
     {
@@ -93,7 +81,8 @@ void Draw(screen* screen)
     vertices[1] = TM*triangles[i].v1 - cameraPos;
     vertices[2] = TM*triangles[i].v2 - cameraPos;
 
-    DrawPolygonEdges(vertices, screen);
+    //DrawPolygonEdges(vertices, screen);
+    DrawPolygon(screen, vertices, triangles[i].color);
 
     // for(int v=0; v<3; ++v)
     // {
@@ -215,6 +204,29 @@ void ComputePolygonRows(const vector<ivec2>& vertexPixels,
         rightPixels[currentY].x = interpolationResults[j].x;
         rightPixels[currentY].y = interpolationResults[j].y;
       }
+    }
+  }
+}
+
+void DrawPolygon(screen* screen,  const vector<vec4>& vertices, vec3 colour )
+{
+  int V = vertices.size();
+  vector<ivec2> vertexPixels( V );
+  for( int i=0; i<V; ++i )
+  VertexShader( vertices[i], vertexPixels[i] );
+  vector<ivec2> leftPixels;
+  vector<ivec2> rightPixels;
+  ComputePolygonRows( vertexPixels, leftPixels, rightPixels );
+  DrawRows(screen, leftPixels, rightPixels, colour );
+}
+
+void DrawRows(screen* screen,
+              const vector<ivec2>& leftPixels,
+              const vector<ivec2>& rightPixels,
+              vec3 colour ) {
+  for (uint i = 0; i < leftPixels.size(); ++i) {
+    for (int j = leftPixels[i].x; j < rightPixels[i].x; j++) {
+      PutPixelSDL(screen, j ,leftPixels[i].y, colour);
     }
   }
 }
