@@ -24,14 +24,19 @@ SDL_Event event;
 vector<Triangle> triangles;
 float focalLength = SCREEN_HEIGHT/2;
 vec4 cameraPos(0, 0, -3.001, 1);
-mat4 R;
+mat4 TM;
 float yaw = 0;
+float pitch = 0;
+float roll = 0;
+float tX = 0;
+float tY = 0;
+float tZ = 0;
+
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
 bool Update();
 void Draw(screen* screen);
-void TransformationMatrix(mat4x4 posCamera, mat4x4 rotation,
-                          mat4x4 negCamera, vec4 worldPoint);
+void TransformationMatrix();
 void VertexShader( const vec4& v, ivec2& p );
 void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result );
 void DrawLineSDL( screen* screen, ivec2 a, ivec2 b, vec3 color );
@@ -64,9 +69,9 @@ void Draw(screen* screen)
   for( uint32_t i=0; i<triangles.size(); ++i )
   {
     vector<vec4> vertices(3);
-    vertices[0] = triangles[i].v0 - cameraPos;
-    vertices[1] = triangles[i].v1 - cameraPos;
-    vertices[2] = triangles[i].v2 - cameraPos;
+    vertices[0] = TM*triangles[i].v0 - cameraPos;
+    vertices[1] = TM*triangles[i].v1 - cameraPos;
+    vertices[2] = TM*triangles[i].v2 - cameraPos;
 
     DrawPolygonEdges(vertices, screen);
 
@@ -104,21 +109,41 @@ bool Update()
 	    switch(key_code)
 	      {
 	      case SDLK_UP:
-        cameraPos.z += 0.2f;
-		/* Move camera forward */
-		break;
+          cameraPos.z += 0.2f;
+      		/* Move camera forward */
+      		break;
 	      case SDLK_DOWN:
-        cameraPos.z -= 0.2f;
-		/* Move camera backwards */
-		break;
+          cameraPos.z -= 0.2f;
+      		/* Move camera backwards */
+      		break;
 	      case SDLK_LEFT:
-        cameraPos.x -= 0.2f;
-		/* Move camera left */
-		break;
+          cameraPos.x -= 0.2f;
+      		/* Move camera left */
+      		break;
 	      case SDLK_RIGHT:
-        cameraPos.x += 0.2f;
-		/* Move camera right */
-		break;
+          cameraPos.x += 0.2f;
+      		/* Move camera right */
+      		break;
+        case SDLK_a:
+          yaw += 0.2f;
+          TransformationMatrix();
+          /* Move camera right */
+          break;
+        case SDLK_d:
+          yaw -= 0.2f;
+          TransformationMatrix();
+          /* Move camera right */
+          break;
+        case SDLK_w:
+          pitch += 0.2f;
+          TransformationMatrix();
+          /* Move camera right */
+          break;
+        case SDLK_s:
+          pitch -= 0.2f;
+          TransformationMatrix();
+          /* Move camera right */
+          break;
 	      case SDLK_ESCAPE:
 		/* Move camera quit */
 		return false;
@@ -128,9 +153,14 @@ bool Update()
   return true;
 }
 
-void TransformationMatrix(mat4x4 posCamera, mat4x4 rotation, mat4x4 negCamera, vec4 worldPoint)
+void TransformationMatrix()
 {
-  cameraPos = posCamera * rotation * negCamera * worldPoint;
+  //rotX = pitch, rotY = yaw, rotZ = roll
+  TM = mat4(cos(yaw)*cos(roll),                                      cos(yaw)*sin(roll),                                    -sin(yaw),           0,
+            sin(pitch)*sin(yaw)*cos(roll) - cos(pitch)*sin(roll),    sin(pitch)*sin(yaw)*sin(roll) + cos(pitch)*cos(roll),  sin(pitch)*cos(yaw), 0,
+            cos(pitch)*sin(yaw)*cos(roll) + sin(pitch)*sin(roll),    cos(pitch)*sin(yaw)*sin(roll) - sin(pitch)*cos(roll),  cos(pitch)*cos(yaw), 0,
+            0,                                                       0,                                                     0,                   1);
+  //cameraPos = posCamera * rotation * negCamera * worldPoint;
 }
 
 void VertexShader( const vec4& v, ivec2& p )
