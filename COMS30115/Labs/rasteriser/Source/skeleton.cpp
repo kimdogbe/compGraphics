@@ -78,7 +78,7 @@ int main( int argc, char* argv[] )
   KillSDL(screen);
   return 0;
 }
-
+// TODO fix the stray pixels that according to carl are probably a depth buffer issue or something
 /*Place your drawing here*/
 void Draw(screen* screen)
 {
