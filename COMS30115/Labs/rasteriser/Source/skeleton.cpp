@@ -39,6 +39,7 @@ float tX = 0;
 float tY = 0;
 float tZ = 0;
 float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
+
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
 bool Update();
@@ -84,12 +85,6 @@ void Draw(screen* screen)
   /* Clear buffer */
   memset(screen->buffer, 0, screen->height*screen->width*sizeof(uint32_t));
 
-  for( int y=0; y<SCREEN_HEIGHT; ++y ){
-    for( int x=0; x<SCREEN_WIDTH; ++x ){
-      depthBuffer[y][x] = 0;
-    }
-  }
-
   for( uint32_t i=0; i<triangles.size(); ++i )
   {
     vector<vec4> vertices(3);
@@ -114,6 +109,12 @@ void Draw(screen* screen)
 /*Place updates of parameters here*/
 bool Update()
 {
+  for( int y=0; y<SCREEN_HEIGHT; ++y ){
+    for( int x=0; x<SCREEN_WIDTH; ++x ){
+      depthBuffer[y][x] = 0;
+    }
+  }
+
   static int t = SDL_GetTicks();
   /* Compute frame time */
   int t2 = SDL_GetTicks();
@@ -215,10 +216,12 @@ void ComputePolygonRows(const vector<Pixel>& vertexPixels,
       if (interpolationResults[j].x < leftPixels[currentY].x) {
         leftPixels[currentY].x = interpolationResults[j].x;
         leftPixels[currentY].y = interpolationResults[j].y;
+        leftPixels[currentY].zinv = interpolationResults[j].zinv;
       }
       if (interpolationResults[j].x > rightPixels[currentY].x) {
         rightPixels[currentY].x = interpolationResults[j].x;
         rightPixels[currentY].y = interpolationResults[j].y;
+        rightPixels[currentY].zinv = interpolationResults[j].zinv;
       }
     }
   }
@@ -229,7 +232,7 @@ void DrawPolygon(screen* screen,  const vector<vec4>& vertices, vec3 colour )
   int V = vertices.size();
   vector<Pixel> vertexPixels( V );
   for( int i=0; i<V; ++i )
-  VertexShader( vertices[i], vertexPixels[i] );
+    VertexShader( vertices[i], vertexPixels[i] );
   vector<Pixel> leftPixels;
   vector<Pixel> rightPixels;
   ComputePolygonRows( vertexPixels, leftPixels, rightPixels );
@@ -242,9 +245,13 @@ void DrawRows(screen* screen,
               vec3 colour ) {
 
   for (uint i = 0; i < leftPixels.size(); ++i) {
-    for (int j = leftPixels[i].x; j < rightPixels[i].x; j++) {
-      if(leftPixels[i].zinv >= depthBuffer[j][i]){
-          PutPixelSDL(screen, j ,leftPixels[i].y, colour);
+    int resultsLength = (rightPixels[i].x - leftPixels[i].x) + 1;
+    std::vector<Pixel> currentRow(resultsLength);
+    Interpolate(leftPixels[i], rightPixels[i], currentRow);
+    for (int j = 0; j < resultsLength; ++j) {
+      if(currentRow[j].zinv  >= depthBuffer[currentRow[j].x][currentRow[j].y] - 0.0002){
+          PutPixelSDL(screen, currentRow[j].x, currentRow[j].y, colour);
+          depthBuffer[currentRow[j].x][currentRow[j].y] = currentRow[j].zinv;
       }
     }
   }
@@ -266,7 +273,9 @@ void VertexShader( const vec4& v, Pixel& p )
   p.x = focalLength * (v.x / v.z) + (SCREEN_WIDTH/2);
   p.y = focalLength * (v.y / v.z) + (SCREEN_HEIGHT/2);
 
-  if(p.zinv > depthBuffer[p.x][p.y]) depthBuffer[p.x][p.y] = p.zinv;
+  if(p.zinv > depthBuffer[p.y][p.x]){
+    depthBuffer[p.y][p.x] = p.zinv;
+  }
 }
 
 void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result )
@@ -285,14 +294,18 @@ void Interpolate(Pixel a, Pixel b, vector<Pixel> &result){
   int N = result.size();
   float stepx = ( b.x - a.x ) / float(max(N-1, 1));
   float stepy = ( b.y - a.y ) / float(max(N-1, 1));
+  float stepz = ( (1 / b.zinv) - (1 / a.zinv) ) / float(max(N-1, 1));
   float currentx = a.x;
   float currenty = a.y;
+  float currentz = 1 / a.zinv;
 
   for(int i=0; i<N; ++i){
     result[i].x = currentx;
     currentx += stepx;
     result[i].y = currenty;
     currenty+= stepy;
+    result[i].zinv = 1 / currentz;
+    currentz += stepz;
   }
 }
 
