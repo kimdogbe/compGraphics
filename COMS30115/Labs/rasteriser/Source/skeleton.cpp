@@ -249,7 +249,7 @@ void DrawRows(screen* screen,
     std::vector<Pixel> currentRow(resultsLength);
     Interpolate(leftPixels[i], rightPixels[i], currentRow);
     for (int j = 0; j < resultsLength; ++j) {
-      if(currentRow[j].zinv  >= depthBuffer[currentRow[j].x][currentRow[j].y] - 0.0002){
+      if(currentRow[j].zinv-0.01  >= depthBuffer[currentRow[j].x][currentRow[j].y]){
           PutPixelSDL(screen, currentRow[j].x, currentRow[j].y, colour);
           depthBuffer[currentRow[j].x][currentRow[j].y] = currentRow[j].zinv;
       }
@@ -270,8 +270,8 @@ void TransformationMatrix()
 void VertexShader( const vec4& v, Pixel& p )
 {
   p.zinv = 1 / v.z;
-  p.x = focalLength * (v.x / v.z) + (SCREEN_WIDTH/2);
-  p.y = focalLength * (v.y / v.z) + (SCREEN_HEIGHT/2);
+  p.x = (focalLength * v.x * p.zinv) + (SCREEN_WIDTH/2);
+  p.y = (focalLength * v.y * p.zinv) + (SCREEN_HEIGHT/2);
 
   if(p.zinv > depthBuffer[p.y][p.x]){
     depthBuffer[p.y][p.x] = p.zinv;
