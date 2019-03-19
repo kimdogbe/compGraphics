@@ -24,7 +24,13 @@ struct Pixel
   int x;
   int y;
   float zinv;
+  vec3 illumination;
 };
+struct Vertex {
+  vec4 position;
+  vec4 normal;
+  vec2 reflectance;
+}
 
 /* ----------------------------------------------------------------------------*/
 /* GLOBAL VARIABLES                                                            */
@@ -40,12 +46,17 @@ float tY = 0;
 float tZ = 0;
 float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
 
+vec4 lightPos(0, -0.5f, -0.7f);
+vec3 lightPower = 1.1f * vec3(1, 1, 1);
+vec3 indirectLightPowerPerArea = 0.5f*vec3( 1, 1, 1 );
+
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
 bool Update();
 void Draw(screen* screen);
 void TransformationMatrix();
 void VertexShader( const vec4& v, Pixel& p );
+void PixelShader( const Pixel& p );
 void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result );
 void Interpolate(Pixel a, Pixel b, vector<Pixel> &result);
 void DrawLineSDL( screen* screen, ivec2 a, ivec2 b, vec3 color );
@@ -88,6 +99,7 @@ void Draw(screen* screen)
   for( uint32_t i=0; i<triangles.size(); ++i )
   {
     vector<vec4> vertices(3);
+    // TODO set reflectance for each vertex
     vertices[0] = TM*triangles[i].v0 - cameraPos;
     vertices[1] = TM*triangles[i].v1 - cameraPos;
     vertices[2] = TM*triangles[i].v2 - cameraPos;
@@ -250,11 +262,22 @@ void DrawRows(screen* screen,
     Interpolate(leftPixels[i], rightPixels[i], currentRow);
     for (int j = 0; j < resultsLength; ++j) {
       if(currentRow[j].zinv-0.01  >= depthBuffer[currentRow[j].x][currentRow[j].y]){
+          //TODO use PixelShader instead of PutPixel to account for illumination
           PutPixelSDL(screen, currentRow[j].x, currentRow[j].y, colour);
           depthBuffer[currentRow[j].x][currentRow[j].y] = currentRow[j].zinv;
       }
     }
   }
+}
+void PixelShader( const Pixel& p )
+{
+  int x = p.x;
+  int y = p.y;
+  if( p.zinv > depthBuffer[y][x] )
+    {
+    depthBuffer[y][x] = f.zinv;
+    PutPixelSDL( screen, x, y, p.illumination );
+    }
 }
 
 void TransformationMatrix()
@@ -272,6 +295,10 @@ void VertexShader( const vec4& v, Pixel& p )
   p.zinv = 1 / v.z;
   p.x = (focalLength * v.x * p.zinv) + (SCREEN_WIDTH/2);
   p.y = (focalLength * v.y * p.zinv) + (SCREEN_HEIGHT/2);
+  // TODO compute p.illumination
+  // Total = reflectance * (Direct + Indirect)
+  // Direct = (lightPower * max({surfacepoint->lightsource vector} DOT surfaceNormal, 0)) 
+  // DIVIDED BY ( 4*PI*{sfp->ls vector}.length() )
 
   if(p.zinv > depthBuffer[p.y][p.x]){
     depthBuffer[p.y][p.x] = p.zinv;
@@ -291,6 +318,7 @@ void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result )
 }
 
 void Interpolate(Pixel a, Pixel b, vector<Pixel> &result){
+  //TODO interpolate illumination for pixels as well
   int N = result.size();
   float stepx = ( b.x - a.x ) / float(max(N-1, 1));
   float stepy = ( b.y - a.y ) / float(max(N-1, 1));
