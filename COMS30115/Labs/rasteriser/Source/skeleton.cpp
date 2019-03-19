@@ -38,7 +38,7 @@ float roll = 0;
 float tX = 0;
 float tY = 0;
 float tZ = 0;
-float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
+float depthBuffer[SCREEN_WIDTH][SCREEN_HEIGHT];
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -109,9 +109,9 @@ void Draw(screen* screen)
 /*Place updates of parameters here*/
 bool Update()
 {
+  for( int x=0; x<SCREEN_WIDTH; ++x ){
   for( int y=0; y<SCREEN_HEIGHT; ++y ){
-    for( int x=0; x<SCREEN_WIDTH; ++x ){
-      depthBuffer[y][x] = 0;
+      depthBuffer[x][y] = 0;
     }
   }
 
@@ -249,7 +249,7 @@ void DrawRows(screen* screen,
     std::vector<Pixel> currentRow(resultsLength);
     Interpolate(leftPixels[i], rightPixels[i], currentRow);
     for (int j = 0; j < resultsLength; ++j) {
-      if(currentRow[j].zinv-0.01  >= depthBuffer[currentRow[j].x][currentRow[j].y]){
+      if(currentRow[j].zinv  >= depthBuffer[currentRow[j].x][currentRow[j].y]){
           PutPixelSDL(screen, currentRow[j].x, currentRow[j].y, colour);
           depthBuffer[currentRow[j].x][currentRow[j].y] = currentRow[j].zinv;
       }
@@ -273,8 +273,8 @@ void VertexShader( const vec4& v, Pixel& p )
   p.x = (focalLength * v.x * p.zinv) + (SCREEN_WIDTH/2);
   p.y = (focalLength * v.y * p.zinv) + (SCREEN_HEIGHT/2);
 
-  if(p.zinv > depthBuffer[p.y][p.x]){
-    depthBuffer[p.y][p.x] = p.zinv;
+  if(p.zinv >= depthBuffer[p.x][p.y]){
+    depthBuffer[p.x][p.y] = p.zinv;
   }
 }
 
@@ -294,7 +294,7 @@ void Interpolate(Pixel a, Pixel b, vector<Pixel> &result){
   int N = result.size();
   float stepx = ( b.x - a.x ) / float(max(N-1, 1));
   float stepy = ( b.y - a.y ) / float(max(N-1, 1));
-  float stepz = ( (1 / b.zinv) - (1 / a.zinv) ) / float(max(N-1, 1));
+  float stepz = ( 1 / b.zinv - 1 / a.zinv ) / float(max(N-1, 1));
   float currentx = a.x;
   float currenty = a.y;
   float currentz = 1 / a.zinv;
