@@ -99,7 +99,7 @@ void Draw(screen* screen)
   for( uint32_t i=0; i<triangles.size(); ++i )
   {
     vector<Vertex> vertices(3);
-    
+
     vertices[0].position = TM*triangles[i].v0 - cameraPos;
     vertices[1].position = TM*triangles[i].v1 - cameraPos;
     vertices[2].position = TM*triangles[i].v2 - cameraPos;
@@ -203,23 +203,37 @@ bool Update()
 void ComputePolygonRows(const vector<Pixel>& vertexPixels,
                               vector <Pixel>& leftPixels,
                               vector <Pixel>& rightPixels) {
+  // 1. Find max and min y-value of the polygon
+  //and compute the number of rows it occupies.
+
   // Compute number of rows required
   int minY =  numeric_limits<int>::max();
   int maxY = -numeric_limits<int>::max();
+
   for (uint i = 0; i < vertexPixels.size(); ++i) {
     if (vertexPixels[i].y > maxY) maxY = vertexPixels[i].y;
     if (vertexPixels[i].y < minY) minY = vertexPixels[i].y;
   }
+
+  // 2. Resize leftPixels and rightPixels
+  //so that they have an element for each row.
+
   // Resize vectors to approporiate number of rows
   uint numRows = maxY - minY + 1;
   leftPixels = vector<Pixel>(numRows);
   rightPixels = vector<Pixel>(numRows);
+
+  // 3. Initialize the x-coordinates in leftPixels
+  //to some really large value and the x-coordinates
+  //in rightPixels to some really small value.
+  
   // Init left and rightPixels vectors
   for( uint i = 0; i<numRows; ++i )
   {
     leftPixels[i].x = +numeric_limits<int>::max();
     rightPixels[i].x = -numeric_limits<int>::max();
   }
+
   for (uint i = 0; i < vertexPixels.size(); ++i) {
     // Take all edges of the polygon
     Pixel firstVertex = vertexPixels[i];
