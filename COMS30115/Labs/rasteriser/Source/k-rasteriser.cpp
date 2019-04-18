@@ -248,6 +248,7 @@ void ComputePolygonRows(const vector<Pixel>& vertexPixels,
         leftPixels[currentY].y = interpolationResults[j].y;
         leftPixels[currentY].zinv = interpolationResults[j].zinv;
         leftPixels[currentY].pos3d = interpolationResults[j].pos3d;
+        //printf("%f\n", leftPixels[currentY].pos3d.y);
       }
       if (interpolationResults[j].x > rightPixels[currentY].x) {
         rightPixels[currentY].x = interpolationResults[j].x;
@@ -319,6 +320,7 @@ void VertexShader( const Vertex &v, Pixel& p )
   p.zinv = 1 / v.position.z;
   p.x = (focalLength * v.position.x * p.zinv) + (SCREEN_WIDTH/2);
   p.y = (focalLength * v.position.y * p.zinv) + (SCREEN_HEIGHT/2);
+  p.pos3d = v.position;
 
   // vec4 n = v.normal;
   // vec4 r = lightPos - v.position;
@@ -354,9 +356,7 @@ void Interpolate(Pixel a, Pixel b, vector<Pixel> &result){
   float currentx = a.x;
   float currenty = a.y;
   float currentz = 1 / a.zinv;
-  vec4 currentIllumination = a.pos3d;
-
-
+  vec4 currentPosition = a.pos3d;
 
   for(int i=0; i<N; ++i){
     result[i].x = currentx;
@@ -365,8 +365,8 @@ void Interpolate(Pixel a, Pixel b, vector<Pixel> &result){
     currenty+= stepy;
     result[i].zinv = 1 / currentz;
     currentz += stepz;
-    result[i].pos3d = currentIllumination;
-    currentIllumination += stepIlllumination;
+    result[i].pos3d = currentPosition;
+    currentPosition += stepIlllumination;
   }
 }
 
