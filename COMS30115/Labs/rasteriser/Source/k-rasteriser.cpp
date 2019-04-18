@@ -15,8 +15,8 @@ using glm::mat4x4;
 
 SDL_Event event;
 
-#define SCREEN_WIDTH 320
-#define SCREEN_HEIGHT 256
+#define SCREEN_WIDTH 640
+#define SCREEN_HEIGHT 512
 #define FULLSCREEN_MODE false
 
 struct Pixel
@@ -45,7 +45,7 @@ float tZ = 0;
 float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
 
 vec4 lightPos(0, -0.5f, -0.7f, 1);
-vec3 lightPower = 22.1f * vec3(1, 1, 1);
+vec3 lightPower = 10.1f * vec3(1, 1, 1);
 vec3 indirectLightPowerPerArea = 0.5f*vec3( 1, 1, 1 );
 
 vec4 currentNormal;
@@ -167,24 +167,40 @@ bool Update()
       		/* Move camera right */
       		break;
         case SDLK_a:
-          yaw += 0.2f;
-          TransformationMatrix();
-          /* Move camera right */
+          /* Rotate clockwise around y-axis */
+          // yaw += 0.2f;
+          // TransformationMatrix();
+          /*move light left*/
+          lightPos.x -= 0.2f;
           break;
         case SDLK_d:
-          yaw -= 0.2f;
-          TransformationMatrix();
-          /* Move camera right */
+          /* Rotate anticlockwise around y-axis */
+          // yaw -= 0.2f;
+          // TransformationMatrix();
+          /*move light right*/
+          lightPos.x += 0.2f;
           break;
         case SDLK_w:
-          pitch += 0.2f;
-          TransformationMatrix();
           /* Move camera right */
+          // pitch += 0.2f;
+          // TransformationMatrix();
+          /*move light down*/
+          lightPos.y -= 0.2f;
           break;
         case SDLK_s:
-          pitch -= 0.2f;
-          TransformationMatrix();
           /* Move camera right */
+          // pitch -= 0.2f;
+          // TransformationMatrix();
+          /*move light up*/
+          lightPos.y += 0.2f;
+          break;
+        case SDLK_e:
+          /*move light away*/
+          lightPos.z += 0.2f;
+          break;
+        case SDLK_q:
+          /*move light closer*/
+          lightPos.z -= 0.2f;
           break;
 	      case SDLK_ESCAPE:
 		/* Move camera quit */
