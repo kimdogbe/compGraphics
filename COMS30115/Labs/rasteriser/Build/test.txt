@@ -1,0 +1,1 @@
+File to check ability of program to read files of type txt vs obj.
