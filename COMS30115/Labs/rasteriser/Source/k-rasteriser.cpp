@@ -55,7 +55,7 @@ float currentReflectance;
 vector< unsigned int > vertexIndices, uvIndices, normalIndices;
 vector<vec4> temp_vertices;
 vector<glm::vec2> temp_uvs;
-vector<vec3> temp_normals;
+vector<vec4> temp_normals;
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -185,31 +185,31 @@ bool Update()
       		break;
         case SDLK_a:
           /* Rotate clockwise around y-axis */
-          // yaw += 0.2f;
-          // TransformationMatrix();
+          yaw += 0.2f;
+          TransformationMatrix();
           /*move light left*/
-          lightPos.x -= 0.2f;
+          // lightPos.x -= 0.2f;
           break;
         case SDLK_d:
           /* Rotate anticlockwise around y-axis */
-          // yaw -= 0.2f;
-          // TransformationMatrix();
+          yaw -= 0.2f;
+          TransformationMatrix();
           /*move light right*/
-          lightPos.x += 0.2f;
+          // lightPos.x += 0.2f;
           break;
         case SDLK_w:
           /* Move camera right */
-          // pitch += 0.2f;
-          // TransformationMatrix();
+          pitch += 0.2f;
+          TransformationMatrix();
           /*move light down*/
-          lightPos.y -= 0.2f;
+          // lightPos.y -= 0.2f;
           break;
         case SDLK_s:
           /* Move camera right */
-          // pitch -= 0.2f;
-          // TransformationMatrix();
+          pitch -= 0.2f;
+          TransformationMatrix();
           /*move light up*/
-          lightPos.y += 0.2f;
+          // lightPos.y += 0.2f;
           break;
         case SDLK_e:
           /*move light away*/
@@ -459,12 +459,12 @@ bool loadOBJ(const char * path, vector <vec3> & out_vertices, vector <glm::vec2>
       glm::vec4 vertex;
       fscanf(file, "%f %f %f\n", &vertex.x, &vertex.y, &vertex.z );
       temp_vertices.push_back(vertex);
-    }else if ( strcmp( lineHeader, "vt" ) == 0 ){
-      glm::vec2 uv;
-      fscanf(file, "%f %f\n", &uv.x, &uv.y );
-      temp_uvs.push_back(uv);
+    // }else if ( strcmp( lineHeader, "vt" ) == 0 ){
+    //   glm::vec2 uv;
+    //   fscanf(file, "%f %f\n", &uv.x, &uv.y );
+    //   temp_uvs.push_back(uv);
     }else if ( strcmp( lineHeader, "vn" ) == 0 ){
-      glm::vec3 normal;
+      glm::vec4 normal;
       fscanf(file, "%f %f %f\n", &normal.x, &normal.y, &normal.z );
       temp_normals.push_back(normal);
     }else if ( strcmp( lineHeader, "f" ) == 0 ){
@@ -475,18 +475,34 @@ bool loadOBJ(const char * path, vector <vec3> & out_vertices, vector <glm::vec2>
           printf("File can't be read by our simple parser : ( Try exporting with other options\n");
           return false;
       }
-      triangles.push_back(Triangle(temp_vertices[vertexIndex[0]], temp_vertices[vertexIndex[1]], temp_vertices[vertexIndex[2]], vec3(0.75f, 0.75f, 0.75f )));
-      vertexIndices.push_back(vertexIndex[0]);
-      vertexIndices.push_back(vertexIndex[1]);
-      vertexIndices.push_back(vertexIndex[2]);
-      uvIndices    .push_back(uvIndex[0]);
-      uvIndices    .push_back(uvIndex[1]);
-      uvIndices    .push_back(uvIndex[2]);
-      normalIndices.push_back(normalIndex[0]);
-      normalIndices.push_back(normalIndex[1]);
-      normalIndices.push_back(normalIndex[2]);
+      Triangle currentTriangle = Triangle(temp_vertices[vertexIndex[0]-1]/-6.0f, (temp_vertices[vertexIndex[1]-1]/-6.0f), temp_vertices[vertexIndex[2]-1]/-6.0f, vec3(1.0f, 0.0f, 1.0f ));
+      currentTriangle.v0.z -= 1;
+      currentTriangle.v1.z -= 1;
+      currentTriangle.v2.z -= 1;
+      vec3 e1 = vec3(temp_vertices[vertexIndex[1]-1].x-temp_vertices[vertexIndex[0]-1].x,
+                     temp_vertices[vertexIndex[1]-1].y-temp_vertices[vertexIndex[0]-1].y,
+                     temp_vertices[vertexIndex[1]-1].z-temp_vertices[vertexIndex[0]-1].z);
+      vec3 e2 = vec3(temp_vertices[vertexIndex[2]-1].x-temp_vertices[vertexIndex[0]-1].x,
+                     temp_vertices[vertexIndex[2]-1].y-temp_vertices[vertexIndex[0]-1].y,
+                     temp_vertices[vertexIndex[2]-1].z-temp_vertices[vertexIndex[0]-1].z);
+      vec3 normal3 = glm::normalize( glm::cross(e2, e1));
+      currentTriangle.normal.x = normal3.x;
+      currentTriangle.normal.y = normal3.y;
+      currentTriangle.normal.z = normal3.z;
+      currentTriangle.normal.w = 1.0f;
+
+      // currentTriangle.normal = temp_normals[normalIndex[0]]/ 3.0f + temp_normals[normalIndex[1]]/ 3.0f + temp_normals[normalIndex[2]] / 3.0f;
+      triangles.push_back(currentTriangle);
+      // vertexIndices.push_back(vertexIndex[0]);
+      // vertexIndices.push_back(vertexIndex[1]);
+      // vertexIndices.push_back(vertexIndex[2]);
+      // uvIndices    .push_back(uvIndex[0]);
+      // uvIndices    .push_back(uvIndex[1]);
+      // uvIndices    .push_back(uvIndex[2]);
+      // normalIndices.push_back(normalIndex[0]);
+      // normalIndices.push_back(normalIndex[1]);
+      // normalIndices.push_back(normalIndex[2]);
     }
-    // printf("v1=%d, v2=%d, v3=%d\n",vertexInd );
   }
 
   // For each vertex of each triangle
