@@ -107,7 +107,7 @@ void LoadTestModel( std::vector<Triangle>& triangles )
 	triangles.push_back( Triangle(E,B,A,red) );
 	triangles.push_back( Triangle(E,F,B,red) );
 
-	// Front
+	// // Front
 	triangles.push_back( Triangle(F,D,B,red) );
 	triangles.push_back( Triangle(F,H,D,red) );
 

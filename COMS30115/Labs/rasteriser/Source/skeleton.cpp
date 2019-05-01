@@ -226,7 +226,7 @@ void ComputePolygonRows(const vector<Pixel>& vertexPixels,
   // 3. Initialize the x-coordinates in leftPixels
   //to some really large value and the x-coordinates
   //in rightPixels to some really small value.
-  
+
   // Init left and rightPixels vectors
   for( uint i = 0; i<numRows; ++i )
   {

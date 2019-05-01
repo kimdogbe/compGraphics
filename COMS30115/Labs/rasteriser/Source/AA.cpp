@@ -26,21 +26,15 @@ struct Pixel
   int y;
   float zinv;
   vec4 pos3d;
+  float brightness = 1.0f;
 };
 struct Vertex {
   vec4 position;
 };
 
-struct Edge {
-  vec4 v0;
-  vec4 v1;
-};
-
 /* ----------------------------------------------------------------------------*/
 /* GLOBAL VARIABLES                                                            */
 vector<Triangle> triangles;
-vector<Triangle> shadowTriangles;
-
 float focalLength = SCREEN_HEIGHT/2;
 vec4 cameraPos(0, 0, -3.001, 1);
 mat4 TM;
@@ -64,8 +58,6 @@ vector<vec4> temp_vertices;
 vector<glm::vec2> temp_uvs;
 vector<vec4> temp_normals;
 
-vector<Edge> contourEdges;
-
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
 bool Update();
@@ -73,6 +65,7 @@ void Draw(screen* screen);
 void TransformationMatrix();
 void VertexShader( const Vertex& v, Pixel& p );
 void PixelShader( screen* screen, const Pixel& p, vec3 pixelOriginalColour );
+void drawAALine(screen* screen, Pixel& a, Pixel& b, vec3 pixelOriginalColour);
 void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result );
 void Interpolate(Pixel a, Pixel b, vector<Pixel> &result);
 void DrawLineSDL( screen* screen, ivec2 a, ivec2 b, vec3 color );
@@ -91,7 +84,6 @@ bool loadOBJ(
     vector <glm::vec2> & out_uvs,
     vector <vec3> & out_normals
 );
-void ComputeShadows(const vector<Vertex>& vertices);
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTION IMPLEMENTED                                                                   */
@@ -124,7 +116,6 @@ void Draw(screen* screen)
   /* Clear buffer */
   memset(screen->buffer, 0, screen->height*screen->width*sizeof(uint32_t));
 
-
   for( uint32_t i=0; i<triangles.size(); ++i )
   {
     vector<Vertex> vertices(3);
@@ -138,7 +129,6 @@ void Draw(screen* screen)
 
     //DrawPolygonEdges(vertices, screen);
     DrawPolygon(screen, vertices, triangles[i].color);
-    ComputeShadows(vertices);
 
     // for(int v=0; v<3; ++v)
     // {
@@ -240,41 +230,112 @@ bool Update()
   return true;
 }
 
-void ComputeShadows(const vector<Vertex>& vertices){
-  lightPos = lightPos * glm::inverse(TM);
+//returns integer part of a floating point number
+int iPartOfNumber(float x)
+{
+    return (int)x;
+}
 
-  vec4 avgPolyPos = (vertices[0].position + vertices[1].position + vertices[2].position) / 3.0f;
-  vec4 lightDir = avgPolyPos - lightPos;
-  vector<Edge> polygonEdges;
+//rounds off a number
+int roundNumber(float x)
+{
+    return iPartOfNumber(x + 0.5) ;
+}
 
-  for (uint i = 0; i < vertices.size(); ++i) {
-    // Take all edges of the polygon
-    Edge currentEdge;
-    currentEdge.v0 = vertices[i].position;
-    currentEdge.v1 = vertices[i+1 % vertices.size()].position;
+//returns fractional part of a number
+float fPartOfNumber(float x)
+{
+    if (x>0) return x - iPartOfNumber(x);
+    else return x - (iPartOfNumber(x)+1);
 
-    polygonEdges.push_back(currentEdge);
-  }
+}
 
-  if(glm::dot(lightDir, currentNormal) >= 0.0){
-    for(uint i = 0; i < polygonEdges.size(); i++){
-      contourEdges.push_back(polygonEdges[i]);
+//returns 1 - fractional part of number
+float rfPartOfNumber(float x)
+{
+    return 1 - fPartOfNumber(x);
+}
+
+void drawAALine(screen* screen, Pixel& a, Pixel& b, vec3 pixelOriginalColour)
+{
+    int x0 = a.x;
+    int y0 = a.y;
+    int x1 = b.x;
+    int y1 = b.y;
+
+    int steep = abs(y1 - y0) > abs(x1 - x0);
+
+    // swap the co-ordinates if slope > 1 or we
+    // draw backwards
+    if (steep)
+    {
+        swap(x0 , y0);
+        swap(x1 , y1);
     }
-  }
+    if (x0 > x1)
+    {
+        swap(x0 ,x1);
+        swap(y0 ,y1);
+    }
 
-  float extrudeMag = 100.0f;
-  for(uint i = 0; i < contourEdges.size(); i++){
-    vec4 shadow_Tri1_v0 = contourEdges[i].v0;
-    vec4 shadow_Tri1_v1 = contourEdges[i].v1;
-    vec4 shadow_Tri1_v2 = contourEdges[i].v0 + extrudeMag * (contourEdges[i].v0 - lightPos);
+    //compute the slope
+    float dx = x1-x0;
+    float dy = y1-y0;
+    float gradient = dy/dx;
+    if (dx == 0.0)
+        gradient = 1;
 
-    vec4 shadow_Tri2_v0 = contourEdges[i].v0 + extrudeMag * (contourEdges[i].v0 - lightPos);
-    vec4 shadow_Tri2_v1 = contourEdges[i].v1 + extrudeMag * (contourEdges[i].v1 - lightPos);
-    vec4 shadow_Tri2_v2 = contourEdges[i].v1;
+    int xpxl1 = x0;
+    int xpxl2 = x1;
+    float intersectY = y0;
 
-    shadowTriangles.push_back(Triangle(shadow_Tri1_v0, shadow_Tri1_v1, shadow_Tri1_v2, vec3(1.0f, 0.0f, 0.0f)));
-    shadowTriangles.push_back(Triangle(shadow_Tri2_v0, shadow_Tri2_v1, shadow_Tri2_v2, vec3(1.0f, 0.0f, 0.0f)));
-  }
+    // main loop
+    if (steep)
+    {
+        int x;
+        for (x = xpxl1 ; x <=xpxl2 ; x++)
+        {
+            // pixel coverage is determined by fractional
+            // part of y co-ordinate
+            Pixel p;
+            p.x = iPartOfNumber(intersectY);
+            p.y = x;
+            p.brightness = rfPartOfNumber(intersectY);
+
+            PixelShader(screen, p, pixelOriginalColour);
+            // drawPixel(iPartOfNumber(intersectY), x,
+            //             rfPartOfNumber(intersectY));
+
+            p.x = iPartOfNumber(intersectY) - 1;
+            p.y = x;
+            p.brightness = fPartOfNumber(intersectY);
+            // drawPixel(iPartOfNumber(intersectY)-1, x,
+            //             fPartOfNumber(intersectY));
+            intersectY += gradient;
+        }
+    }
+    else
+    {
+        int x;
+        for (x = xpxl1 ; x <=xpxl2 ; x++)
+        {
+            // pixel coverage is determined by fractional
+            // part of y co-ordinate
+            Pixel p;
+            p.x = x;
+            p.y = iPartOfNumber(intersectY);
+            p.brightness = rfPartOfNumber(intersectY);
+            // drawPixel(x, iPartOfNumber(intersectY),
+            //             rfPartOfNumber(intersectY));
+            p.x = x;
+            p.y = iPartOfNumber(intersectY)-1;
+            p.brightness = fPartOfNumber(intersectY);
+            // drawPixel(x, iPartOfNumber(intersectY)-1,
+            //               fPartOfNumber(intersectY));
+            intersectY += gradient;
+        }
+    }
+
 }
 
 void ComputePolygonRows(const vector<Pixel>& vertexPixels,
@@ -315,6 +376,7 @@ void ComputePolygonRows(const vector<Pixel>& vertexPixels,
     // Take all edges of the polygon
     Pixel firstVertex = vertexPixels[i];
     Pixel secondVertex = vertexPixels[(i+1) % vertexPixels.size()];
+    drawAALine(screen, firstVertex, secondVertex, colour);
     // Interpolate 1 result for each row
     int edgeHeight = abs(firstVertex.y - secondVertex.y) + 1;
     int startingY = firstVertex.y;
@@ -384,7 +446,7 @@ void PixelShader(screen* screen, const Pixel& p, vec3 pixelOriginalColour )
 
   if( p.zinv > depthBuffer[y][x] ) {
       depthBuffer[y][x] = p.zinv;
-      PutPixelSDL( screen, x, y, total * pixelOriginalColour );
+      PutPixelSDL( screen, x, y, (total * pixelOriginalColour * p.brightness) );
     }
 }
 
