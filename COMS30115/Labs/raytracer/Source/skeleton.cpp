@@ -23,6 +23,8 @@ struct Intersection
 vec4 position;
 float distance;
 int triangleIndex;
+float bumpX;
+float bumpY;
 };
 
 vector<Triangle> triangles;
@@ -38,11 +40,12 @@ float pitch = 0;
 vec4 lightPos( 0, -0.5, -0.7, 1.0 );
 vec3 lightColor = 14.f * vec3( 1, 1, 1 );
 
-vec3 indirectLightColor = 0.23f * vec3(1,1,1);
+vec3 indirectLightColor = 0.52f * vec3(1,1,1);
 
-const float glossiness = 0.0f;
-const int numTestRays = 8; 
-const int numBounces = 2;
+const float glossiness = 0.15f;
+const int numTestRays = 4;
+const int numBounces = 1;
+const float bounceColourRetainment = 0.2;
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -54,7 +57,8 @@ vec4 RotateCameraX(vec4 vectorRotate, float dPitch);
 bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles,
    Intersection& closestIntersection );
 vec3 DirectLight(const Intersection& i);
-vec3 BounceRay(const vector<Triangle>& triangles, vec4 incomingRay, vec4 incomingRayEndpoint, vec4 incomingNormal, float glossiness, int numTestRays, int remainingBounces);
+vec4 crossVec4(vec4 _v1, vec4 _v2);
+vec3 BounceRay(const vector<Triangle>& triangles, vec4 incomingRay, Intersection currentIntersection, float glossiness, int numTestRays, int remainingBounces);
 
 int main( int argc, char* argv[] )
 {
@@ -96,7 +100,7 @@ void Draw(screen* screen)
         ClosestIntersection(closestIntersection.position + 0.01f*triangles[closestIntersection.triangleIndex].normal, shadowRay, triangles, shadowIntersection);
         float surfaceToSurface = shadowIntersection.distance;
         float surfaceToLight = length(closestIntersection.position - lightPos);
-        colour = BounceRay(triangles, rayDir, cameraPos + (rayDir * closestIntersection.distance), triangles[closestIntersection.triangleIndex].normal, glossiness, numTestRays, numBounces); //indirectLightColor * triangles[closestIntersection.triangleIndex].color;
+        colour = BounceRay(triangles, rayDir, closestIntersection, glossiness, numTestRays, numBounces) * indirectLightColor ;
         if (surfaceToSurface >= surfaceToLight) {
           colour += (DirectLight(closestIntersection)) *
            triangles[closestIntersection.triangleIndex].color;
@@ -239,24 +243,33 @@ vec4 RotateCameraX(vec4 vectorRotate, float dPitch){
   return rot*vectorRotate;
 }
 
-vec3 BounceRay(const vector<Triangle>& triangles, vec4 incomingRay, vec4 incomingRayEndpoint, vec4 incomingNormal, float glossiness, int numTestRays, int remainingBounces) {
+vec4 crossVec4(vec4 _v1, vec4 _v2){
+    vec3 vec1 = vec3(_v1[0], _v1[1], _v1[2]);
+    vec3 vec2 = vec3(_v2[0], _v2[1], _v2[2]);
+    vec3 res = cross(vec1, vec2);
+    return vec4(res[0], res[1], res[2], 1);
+}
+
+vec3 BounceRay(const vector<Triangle>& triangles, vec4 incomingRay, Intersection currentIntersection, float glossiness, int numTestRays, int remainingBounces) {
   // Take incoming ray's mirror direction on the plane defined by triangle's normal
-  if (remainingBounces == 0) return vec3(1,1,1);
-  incomingNormal = normalize(incomingNormal);
+  vec3 selfColour = triangles[currentIntersection.triangleIndex].color;
+  if (remainingBounces == 0) return selfColour;
+  vec4 incomingNormal = normalize(triangles[currentIntersection.triangleIndex].normal);
+  vec4 incomingRayEndpoint = currentIntersection.position;
   vec4 mirroredRay = incomingRay - 2 * dot(incomingRay, incomingNormal) * incomingNormal;
 
-  vec3 colourSum = vec3(0,0,0);
+  vec3 colourSum = vec3(0.0,0.0,0.0);
   // Calculate numTestRays random directions in the 'hemisphere" defined by the mirrored direction and the full hemisphere scaled by glossiness down to that size
   for (int i = 0; i < numTestRays; i++) {
-    radDev = (rand() * (float)M_PI * 2 - (float)M_PI) * glossiness; 
-    float angleToPlane = acos(dot(normalize(mirroredRay, incomingNormal)));
-    scalingDev = (rand() * glossiness * M_PI - (M_PI / 2)) - angleToPlane;
+    float radDev = (rand() * (float)M_PI * 2 - (float)M_PI) * glossiness;
+    float angleToPlane = acos(dot(normalize(mirroredRay), incomingNormal));
+    float scalingDev = ((rand()  * M_PI - (M_PI / 2)) - angleToPlane) * glossiness ;
 
-    vec4 rotV = mirroredRay * cos(radDev) + (incomingNormal * mirroredRay) * sin(radDev) +
+    vec4 rotV = mirroredRay * cos(radDev) + crossVec4(incomingNormal,mirroredRay) * sin(radDev) +
                 incomingNormal * dot(incomingNormal, mirroredRay) * (1.0f - cos(radDev));
     vec4 mirroredRotV = rotV - 2 * dot(rotV, incomingNormal) * incomingNormal;
-    vec secondRotationAxis = normalize(rotV * mirroredRotV);
-    vector finalV = rotV * cos(scalingDev) + (secondRotationAxis * rotV) * sin(scalingDev) +
+    vec4 secondRotationAxis = normalize(crossVec4(rotV,mirroredRotV));
+    vec4 finalV = rotV * cos(scalingDev) + (secondRotationAxis * rotV) * sin(scalingDev) +
                 secondRotationAxis * dot(secondRotationAxis, rotV) * (1.0f - cos(scalingDev));
 
     // test ray against triangles
@@ -264,19 +277,16 @@ vec3 BounceRay(const vector<Triangle>& triangles, vec4 incomingRay, vec4 incomin
     Intersection bounceIntersection;
     if (ClosestIntersection(incomingRayEndpoint, finalV, triangles, bounceIntersection)) {
       // If it hits a triangle, continue recursion
-      nextNormal = triangles[bounceIntersection.triangleIndex].normal
-      colourSum += BounceRay(finalV, (incomingRayEndpoint + finalV),  nextNormal, glossiness, numTestRays, remainingBounces-1);
+      colourSum += BounceRay(triangles, finalV, bounceIntersection, glossiness, numTestRays, remainingBounces-1);
     } else {
-      // unnecessary but just in case the bounce ray hits nothing and we want to do something in the future
-      colourSum += vec3(0,0,0);
+      colourSum += selfColour;
     }
-    
+
   }
   // at 0 glossiness it's a straight mirror and all test rays go in direction of the mirrored ray
   // at 1 glossiness they go in any direction on the full hemisphere around the normal
 
-  colourSum = colourSum / numTestRays;
-  // Return result colour value (scaled by BounceLightRetainment?)
+  colourSum = ((colourSum / (float)numTestRays) * (1-bounceColourRetainment)) + (selfColour * bounceColourRetainment);
   return colourSum;
 }
 
@@ -316,6 +326,8 @@ bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles
       if(closestIntersection.distance > currentDistance){
         closestIntersection.position = currentPoint;
         closestIntersection.distance = x.x;
+        closestIntersection.bumpX = x.y;
+        closestIntersection.bump = x.z;
         /*might need refining by substracting start from it*/
         //closestIntersection.distance = currentDistance;
         closestIntersection.triangleIndex = i;
@@ -324,6 +336,10 @@ bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles
     }
   }
   return inTriangle;
+}
+
+float FetchMapValue(Intersection in) {
+
 }
 
 vec3 DirectLight(const Intersection& i){
