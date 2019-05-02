@@ -5,6 +5,8 @@
 #include "TestModelH.h"
 #include <stdint.h>
 #include "limits.h"
+#include <fstream>
+#include <string>
 
 using namespace std;
 using glm::vec3;
@@ -47,6 +49,10 @@ const int numTestRays = 4;
 const int numBounces = 1;
 const float bounceColourRetainment = 0.2;
 
+vector<int> bumpMap;
+const int mapSizeX = 500;
+const int mapSizeY = 300;
+
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
 
@@ -59,9 +65,21 @@ bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles
 vec3 DirectLight(const Intersection& i);
 vec4 crossVec4(vec4 _v1, vec4 _v2);
 vec3 BounceRay(const vector<Triangle>& triangles, vec4 incomingRay, Intersection currentIntersection, float glossiness, int numTestRays, int remainingBounces);
+float FetchMapValue(Intersection in);
+vec4 AdjustNormal(Intersection in, vec4 originalNormal, vec4 cameraPos);
 
 int main( int argc, char* argv[] )
 {
+
+  ifstream mapFile ("Build/metal.pgm", ios::in);
+  for (int i = 0; i < mapSizeX; i++) {
+    for (int j = 0; j< mapSizeY; j++) {
+      int mapVal;
+      mapFile >> mapVal;
+      bumpMap.insert(bumpMap.begin(), mapVal);
+    }
+  }
+  mapFile.close();
 
   /*fill vector with triangles from testModel*/
   LoadTestModel(triangles);
@@ -339,12 +357,25 @@ bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles
 }
 
 float FetchMapValue(Intersection in) {
-
+    int mapX = (int)round(in.bumpX * (float)mapSizeX);
+    int mapY = (int)round(in.bumpY * (float)mapSizeY);
+    float retVal = (float)(bumpMap[mapY*mapSizeX + mapX]) * (M_PI / (255.0f * 2.0f));
+    //printf("%f \n", (float)(bumpMap[mapY*mapSizeX + mapX]));
+    return retVal;
+    //return sin(mapX)+cos(mapY);
+}
+vec4 AdjustNormal(Intersection in, vec4 originalNormal, vec4 cameraPos) {
+    vec4 rotAxis = normalize(crossVec4(originalNormal,cameraPos));
+    float rotValue = FetchMapValue(in) * (float)M_PI / 2.0f;
+    vec4 newNormal = originalNormal * cos(rotValue) + (rotAxis * originalNormal) * sin(rotValue) +
+                rotAxis * dot(rotAxis, originalNormal) * (1.0f - cos(rotValue));
+    return newNormal;
 }
 
 vec3 DirectLight(const Intersection& i){
   vec4 n = triangles[i.triangleIndex].normal;
   vec4 r = lightPos - i.position;
+  n = AdjustNormal(i, n, r);
   float rLength = length(r);
   float maxval = max(dot(normalize(r), n),0.0f);
   vec3 direct = (lightColor * maxval) / (4.0f * (float)M_PI * rLength * rLength);
