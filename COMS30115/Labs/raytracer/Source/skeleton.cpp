@@ -40,18 +40,23 @@ float pitch = 0;
 
 /*illumination*/
 vec4 lightPos( 0, -0.5, -0.7, 1.0 );
-vec3 lightColor = 14.f * vec3( 1, 1, 1 );
+vec3 lightColor = 11.f * vec3( 1, 1, 1 );
 
 vec3 indirectLightColor = 0.52f * vec3(1,1,1);
 
-const float glossiness = 0.15f;
-const int numTestRays = 4;
+const float glossiness = 0.8f;
+const int numTestRays = 5;
 const int numBounces = 1;
 const float bounceColourRetainment = 0.2;
 
 vector<int> bumpMap;
 const int mapSizeX = 500;
 const int mapSizeY = 300;
+
+vector< unsigned int > vertexIndices, uvIndices, normalIndices;
+vector<vec4> temp_vertices;
+vector<glm::vec2> temp_uvs;
+vector<vec4> temp_normals;
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -67,9 +72,18 @@ vec4 crossVec4(vec4 _v1, vec4 _v2);
 vec3 BounceRay(const vector<Triangle>& triangles, vec4 incomingRay, Intersection currentIntersection, float glossiness, int numTestRays, int remainingBounces);
 float FetchMapValue(Intersection in);
 vec4 AdjustNormal(Intersection in, vec4 originalNormal, vec4 cameraPos);
+bool loadOBJ(const char * path, vector <vec3> & out_vertices, vector <glm::vec2> & out_uvs,
+              vector <vec3> & out_normals);
 
 int main( int argc, char* argv[] )
 {
+  /*fill vector with triangles from testModel*/
+  LoadTestModel(triangles);
+  vector<vec3> vertices;
+  vector<glm::vec2> uvs;
+  vector<vec3> normals;
+  bool res = loadOBJ("sphere.obj", vertices, uvs, normals);
+  if(!res) printf("Problem loading obj file\n");
 
   ifstream mapFile ("Build/metal.pgm", ios::in);
   for (int i = 0; i < mapSizeX; i++) {
@@ -81,8 +95,7 @@ int main( int argc, char* argv[] )
   }
   mapFile.close();
 
-  /*fill vector with triangles from testModel*/
-  LoadTestModel(triangles);
+
 
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
 
@@ -281,7 +294,7 @@ vec3 BounceRay(const vector<Triangle>& triangles, vec4 incomingRay, Intersection
   for (int i = 0; i < numTestRays; i++) {
     float radDev = (rand() * (float)M_PI * 2 - (float)M_PI) * glossiness;
     float angleToPlane = acos(dot(normalize(mirroredRay), incomingNormal));
-    float scalingDev = ((rand()  * M_PI - (M_PI / 2)) - angleToPlane) * glossiness ;
+    float scalingDev = ((rand()  * M_PI - (M_PI / 2)) + angleToPlane) * glossiness ;
 
     vec4 rotV = mirroredRay * cos(radDev) + crossVec4(incomingNormal,mirroredRay) * sin(radDev) +
                 incomingNormal * dot(incomingNormal, mirroredRay) * (1.0f - cos(radDev));
@@ -380,4 +393,84 @@ vec3 DirectLight(const Intersection& i){
   float maxval = max(dot(normalize(r), n),0.0f);
   vec3 direct = (lightColor * maxval) / (4.0f * (float)M_PI * rLength * rLength);
   return direct;
+}
+
+bool loadOBJ(const char * path, vector <vec3> & out_vertices, vector <glm::vec2> & out_uvs,
+              vector <vec3> & out_normals)
+{
+  printf("%s\n", path);
+  FILE * file = fopen(path, "r");
+  if( file == NULL ){
+      printf("Impossible to open the file !\n");
+      return false;
+  }
+
+  while( 1 ){
+
+    char lineHeader[128];
+    // read the first word of the line
+    int res = fscanf(file, "%s", lineHeader);
+    if (res == EOF)
+        break; // EOF = End Of File. Quit the loop.
+
+    // else : parse lineHeader
+
+    if ( strcmp( lineHeader, "v" ) == 0 ){
+      glm::vec4 vertex;
+      fscanf(file, "%f %f %f\n", &vertex.x, &vertex.y, &vertex.z );
+      temp_vertices.push_back(vertex);
+    // }else if ( strcmp( lineHeader, "vt" ) == 0 ){
+    //   glm::vec2 uv;
+    //   fscanf(file, "%f %f\n", &uv.x, &uv.y );
+    //   temp_uvs.push_back(uv);
+    }else if ( strcmp( lineHeader, "vn" ) == 0 ){
+      glm::vec4 normal;
+      fscanf(file, "%f %f %f\n", &normal.x, &normal.y, &normal.z );
+      temp_normals.push_back(normal);
+    }else if ( strcmp( lineHeader, "f" ) == 0 ){
+      std::string vertex1, vertex2, vertex3;
+      unsigned int vertexIndex[3], uvIndex[3], normalIndex[3];
+      int matches = fscanf(file, "%d/%d/%d %d/%d/%d %d/%d/%d\n", &vertexIndex[0], &uvIndex[0], &normalIndex[0], &vertexIndex[1], &uvIndex[1], &normalIndex[1], &vertexIndex[2], &uvIndex[2], &normalIndex[2] );
+      if (matches != 9){
+          printf("File can't be read by our simple parser : ( Try exporting with other options\n");
+          return false;
+      }
+      Triangle currentTriangle = Triangle(temp_vertices[vertexIndex[0]-1]/-6.0f, (temp_vertices[vertexIndex[1]-1]/-6.0f), temp_vertices[vertexIndex[2]-1]/-6.0f, vec3(1.0f, 0.0f, 1.0f ));
+      currentTriangle.v0.z -= 1;
+      currentTriangle.v1.z -= 1;
+      currentTriangle.v2.z -= 1;
+      vec3 e1 = vec3(temp_vertices[vertexIndex[1]-1].x-temp_vertices[vertexIndex[0]-1].x,
+                     temp_vertices[vertexIndex[1]-1].y-temp_vertices[vertexIndex[0]-1].y,
+                     temp_vertices[vertexIndex[1]-1].z-temp_vertices[vertexIndex[0]-1].z);
+      vec3 e2 = vec3(temp_vertices[vertexIndex[2]-1].x-temp_vertices[vertexIndex[0]-1].x,
+                     temp_vertices[vertexIndex[2]-1].y-temp_vertices[vertexIndex[0]-1].y,
+                     temp_vertices[vertexIndex[2]-1].z-temp_vertices[vertexIndex[0]-1].z);
+      vec3 normal3 = glm::normalize( glm::cross(e2, e1));
+      currentTriangle.normal.x = normal3.x;
+      currentTriangle.normal.y = normal3.y;
+      currentTriangle.normal.z = normal3.z;
+      currentTriangle.normal.w = 1.0f;
+
+      // currentTriangle.normal = temp_normals[normalIndex[0]]/ 3.0f + temp_normals[normalIndex[1]]/ 3.0f + temp_normals[normalIndex[2]] / 3.0f;
+      triangles.push_back(currentTriangle);
+      // vertexIndices.push_back(vertexIndex[0]);
+      // vertexIndices.push_back(vertexIndex[1]);
+      // vertexIndices.push_back(vertexIndex[2]);
+      // uvIndices    .push_back(uvIndex[0]);
+      // uvIndices    .push_back(uvIndex[1]);
+      // uvIndices    .push_back(uvIndex[2]);
+      // normalIndices.push_back(normalIndex[0]);
+      // normalIndices.push_back(normalIndex[1]);
+      // normalIndices.push_back(normalIndex[2]);
+    }
+  }
+
+  // For each vertex of each triangle
+  // for( unsigned int i=0; i<vertexIndices.size(); i++ ){
+  //   unsigned int vertexIndex = vertexIndices[i];
+  //   glm::vec3 vertex = temp_vertices[ vertexIndex-1 ];
+  //   out_vertices.push_back(vertex);
+  // }
+
+  return true;
 }
