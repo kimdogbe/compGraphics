@@ -327,7 +327,7 @@ bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles
         closestIntersection.position = currentPoint;
         closestIntersection.distance = x.x;
         closestIntersection.bumpX = x.y;
-        closestIntersection.bump = x.z;
+        closestIntersection.bumpY = x.z;
         /*might need refining by substracting start from it*/
         //closestIntersection.distance = currentDistance;
         closestIntersection.triangleIndex = i;
