@@ -16,8 +16,8 @@ using glm::mat4;
 
 float m = std::numeric_limits<float>::max();
 
-#define SCREEN_WIDTH 260
-#define SCREEN_HEIGHT 240
+#define SCREEN_WIDTH 1040
+#define SCREEN_HEIGHT 960
 #define FULLSCREEN_MODE false
 
 struct Intersection
@@ -39,7 +39,7 @@ float yaw = 0;
 float pitch = 0;
 
 /*illumination*/
-vec4 lightPos( 0, -0.5, -0.7, 1.0 );
+vec4 lightPos( 0, -0.3, -0.3, 1.0 );
 vec3 lightColor = 11.f * vec3( 1, 1, 1 );
 
 vec3 indirectLightColor = 0.52f * vec3(1,1,1);
@@ -47,11 +47,19 @@ vec3 indirectLightColor = 0.52f * vec3(1,1,1);
 const float glossiness = 0.8f;
 const int numTestRays = 5;
 const int numBounces = 1;
-const float bounceColourRetainment = 0.2;
+const float bounceColourRetainment = 0.2f;
 
 vector<int> bumpMap;
 const int mapSizeX = 500;
 const int mapSizeY = 300;
+
+vector<vec3> textureMap;
+const int textureSizeX = 500;
+const int textureSizeY = 300;
+vec3 yellow( 0.75f, 0.75f, 0.15f );
+
+float lightBloomMaxDist = 0.1f;
+float lightBloomIntensity = 8.9f;
 
 vector< unsigned int > vertexIndices, uvIndices, normalIndices;
 vector<vec4> temp_vertices;
@@ -67,13 +75,15 @@ vec4 RotateCameraY(vec4 vectorRotate, float dYaw);
 vec4 RotateCameraX(vec4 vectorRotate, float dPitch);
 bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles,
    Intersection& closestIntersection );
-vec3 DirectLight(const Intersection& i);
+vec3 DirectLight(const Intersection& i, vec4 cameraPos, vec4 cameraRayDir );
 vec4 crossVec4(vec4 _v1, vec4 _v2);
 vec3 BounceRay(const vector<Triangle>& triangles, vec4 incomingRay, Intersection currentIntersection, float glossiness, int numTestRays, int remainingBounces);
 float FetchMapValue(Intersection in);
+vec3 FetchTextureValue(Intersection in);
 vec4 AdjustNormal(Intersection in, vec4 originalNormal, vec4 cameraPos);
 bool loadOBJ(const char * path, vector <vec3> & out_vertices, vector <glm::vec2> & out_uvs,
               vector <vec3> & out_normals);
+float VectorPointDistance(vec4 vectorStart, vec4 vectorDir, vec4 pointPos);
 
 int main( int argc, char* argv[] )
 {
@@ -82,8 +92,8 @@ int main( int argc, char* argv[] )
   vector<vec3> vertices;
   vector<glm::vec2> uvs;
   vector<vec3> normals;
-  bool res = loadOBJ("sphere.obj", vertices, uvs, normals);
-  if(!res) printf("Problem loading obj file\n");
+  //bool res = loadOBJ("sphere.obj", vertices, uvs, normals);
+  //if(!res) printf("Problem loading obj file\n");
 
   ifstream mapFile ("Build/metal.pgm", ios::in);
   for (int i = 0; i < mapSizeX; i++) {
@@ -94,6 +104,23 @@ int main( int argc, char* argv[] )
     }
   }
   mapFile.close();
+
+  ifstream textureFileRed ("Build/redIron.pgm", ios::in);
+  ifstream textureFileGreen ("Build/greenIron.pgm", ios::in);
+  ifstream textureFileBlue ("Build/blueIron.pgm", ios::in);
+  for (int i = 0; i < textureSizeX; i++) {
+    for (int j = 0; j< textureSizeY; j++) {
+      int redVal, greenVal, blueVal;
+      textureFileRed >> redVal;
+      textureFileGreen >> greenVal;
+      textureFileBlue >> blueVal;
+      vec3 rgbVal = vec3(redVal, greenVal, blueVal);
+      textureMap.insert(textureMap.begin(), rgbVal);
+    }
+  }
+  textureFileRed.close();
+  textureFileGreen.close();
+  textureFileBlue.close();
 
 
 
@@ -133,8 +160,13 @@ void Draw(screen* screen)
         float surfaceToLight = length(closestIntersection.position - lightPos);
         colour = BounceRay(triangles, rayDir, closestIntersection, glossiness, numTestRays, numBounces) * indirectLightColor ;
         if (surfaceToSurface >= surfaceToLight) {
-          colour += (DirectLight(closestIntersection)) *
-           triangles[closestIntersection.triangleIndex].color;
+            if (triangles[closestIntersection.triangleIndex].color == yellow) {
+                colour += (DirectLight(closestIntersection, cameraPos, rayDir)) *
+                FetchTextureValue(closestIntersection);
+            } else {
+                colour += (DirectLight(closestIntersection, cameraPos, rayDir)) *
+                       triangles[closestIntersection.triangleIndex].color;
+            }
         }
       }else{
         colour = vec3(0.0, 0.0, 0.0);
@@ -318,6 +350,9 @@ vec3 BounceRay(const vector<Triangle>& triangles, vec4 incomingRay, Intersection
   // at 1 glossiness they go in any direction on the full hemisphere around the normal
 
   colourSum = ((colourSum / (float)numTestRays) * (1-bounceColourRetainment)) + (selfColour * bounceColourRetainment);
+  if (colourSum == yellow) {
+      colourSum = FetchTextureValue(currentIntersection);
+  }
   return colourSum;
 }
 
@@ -326,7 +361,7 @@ bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles
    Intersection& closestIntersection ){
 
   //dir = RotateCameraY(dir, yaw);
-  vec4 targetView(0.5f,0.5f,0.5f,1.0f);
+  vec4 targetView(0.0f,0.0f,0.8f,1.0f);
   dir = LookAt(targetView, cameraPos, dir);
 
   bool inTriangle = false;
@@ -369,6 +404,13 @@ bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles
   return inTriangle;
 }
 
+vec3 FetchTextureValue(Intersection in) {
+    int mapX = (int)round(in.bumpX * (float)textureSizeX);
+    int mapY = (int)round(in.bumpY * (float)textureSizeY);
+    vec3 retVal = textureMap[mapY*mapSizeX + mapX] / 255.0f;
+    return retVal;
+}
+
 float FetchMapValue(Intersection in) {
     int mapX = (int)round(in.bumpX * (float)mapSizeX);
     int mapY = (int)round(in.bumpY * (float)mapSizeY);
@@ -385,14 +427,31 @@ vec4 AdjustNormal(Intersection in, vec4 originalNormal, vec4 cameraPos) {
     return newNormal;
 }
 
-vec3 DirectLight(const Intersection& i){
+vec3 DirectLight(const Intersection& i, vec4 cameraPos, vec4 cameraRayDir ){
   vec4 n = triangles[i.triangleIndex].normal;
   vec4 r = lightPos - i.position;
   n = AdjustNormal(i, n, r);
   float rLength = length(r);
   float maxval = max(dot(normalize(r), n),0.0f);
   vec3 direct = (lightColor * maxval) / (4.0f * (float)M_PI * rLength * rLength);
+
+  float distToLight = VectorPointDistance(cameraPos, cameraRayDir, lightPos);
+  if (distToLight < lightBloomMaxDist) {
+      float distsq = (((lightBloomMaxDist - distToLight) * (lightBloomMaxDist - distToLight)));
+      float scaling =  (1.0f/lightBloomMaxDist) * (1.0f/lightBloomMaxDist);
+      direct *= lightBloomIntensity * (scaling + 1) * distsq;
+  }
+
   return direct;
+}
+
+float VectorPointDistance(vec4 vectorStart, vec4 vectorDir, vec4 pointPos) {
+    vec4 x0 = pointPos;
+    vec4 x1 = vectorStart;
+    vec4 x2 = x1 + vectorDir;
+    float crp = length(crossVec4((x0-x1),(x0-x2)));
+    float den = length(x2-x1);
+    return (crp /den);
 }
 
 bool loadOBJ(const char * path, vector <vec3> & out_vertices, vector <glm::vec2> & out_uvs,
@@ -453,24 +512,8 @@ bool loadOBJ(const char * path, vector <vec3> & out_vertices, vector <glm::vec2>
 
       // currentTriangle.normal = temp_normals[normalIndex[0]]/ 3.0f + temp_normals[normalIndex[1]]/ 3.0f + temp_normals[normalIndex[2]] / 3.0f;
       triangles.push_back(currentTriangle);
-      // vertexIndices.push_back(vertexIndex[0]);
-      // vertexIndices.push_back(vertexIndex[1]);
-      // vertexIndices.push_back(vertexIndex[2]);
-      // uvIndices    .push_back(uvIndex[0]);
-      // uvIndices    .push_back(uvIndex[1]);
-      // uvIndices    .push_back(uvIndex[2]);
-      // normalIndices.push_back(normalIndex[0]);
-      // normalIndices.push_back(normalIndex[1]);
-      // normalIndices.push_back(normalIndex[2]);
     }
   }
-
-  // For each vertex of each triangle
-  // for( unsigned int i=0; i<vertexIndices.size(); i++ ){
-  //   unsigned int vertexIndex = vertexIndices[i];
-  //   glm::vec3 vertex = temp_vertices[ vertexIndex-1 ];
-  //   out_vertices.push_back(vertex);
-  // }
 
   return true;
 }
