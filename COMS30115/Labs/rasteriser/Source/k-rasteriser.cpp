@@ -5,6 +5,7 @@
 #include "TestModelH.h"
 #include <stdint.h>
 #include <stdio.h>
+#include <algorithm>
 
 using namespace std;
 using glm::vec3;
@@ -16,8 +17,8 @@ using glm::mat4x4;
 
 SDL_Event event;
 
-#define SCREEN_WIDTH 640
-#define SCREEN_HEIGHT 512
+#define SCREEN_WIDTH 1024
+#define SCREEN_HEIGHT 980
 #define FULLSCREEN_MODE false
 
 struct Pixel
@@ -27,6 +28,7 @@ struct Pixel
   float zinv;
   vec4 pos3d;
 };
+
 struct Vertex {
   vec4 position;
 };
@@ -65,6 +67,9 @@ vector<glm::vec2> temp_uvs;
 vector<vec4> temp_normals;
 
 vector<Edge> contourEdges;
+int stencilBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
+bool zBufferAllowed;
+bool stencilTesting;
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -91,7 +96,7 @@ bool loadOBJ(
     vector <glm::vec2> & out_uvs,
     vector <vec3> & out_normals
 );
-void ComputeShadows(const vector<Vertex>& vertices);
+void ComputeShadows();
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTION IMPLEMENTED                                                                   */
@@ -101,7 +106,7 @@ int main( int argc, char* argv[] )
   // vector<vec3> vertices;
   // vector<glm::vec2> uvs;
   // vector<vec3> normals;
-  // bool res = loadOBJ("sphere.obj", vertices, uvs, normals);
+  // bool res = loadOBJ("sBunny.obj", vertices, uvs, normals);
   // if(!res) printf("Problem loading obj file\n");
 
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
@@ -124,7 +129,20 @@ void Draw(screen* screen)
   /* Clear buffer */
   memset(screen->buffer, 0, screen->height*screen->width*sizeof(uint32_t));
 
+  // shadowTriangles.clear();
+  // contourEdges.clear();
+  // ComputeShadows();
 
+  // clear stencil buffer;
+  // for(int x = 0; x < SCREEN_WIDTH; x++){
+  //   for(int y = 0; y < SCREEN_HEIGHT; y++){
+  //     stencilBuffer[y][x] = 0;
+  //     depthBuffer[y][x] = 0;
+  //   }
+  // }
+
+  zBufferAllowed = true;
+  stencilTesting = true;
   for( uint32_t i=0; i<triangles.size(); ++i )
   {
     vector<Vertex> vertices(3);
@@ -136,19 +154,49 @@ void Draw(screen* screen)
     vertices[1].position = TM*triangles[i].v1 - cameraPos;
     vertices[2].position = TM*triangles[i].v2 - cameraPos;
 
-    //DrawPolygonEdges(vertices, screen);
     DrawPolygon(screen, vertices, triangles[i].color);
-    ComputeShadows(vertices);
-
-    // for(int v=0; v<3; ++v)
-    // {
-    //   ivec2 projPos;
-    //   VertexShader( vertices[v], projPos );
-    //
-    //   vec3 color(1,1,1);
-    //   PutPixelSDL( screen, projPos.x, projPos.y, color );
-    // }
   }
+
+  // zBufferAllowed = false;
+  // stencilTesting = true;
+  // for( uint32_t i=0; i<shadowTriangles.size(); ++i )
+  // {
+  //   vector<Vertex> vertices(3);
+  //
+  //   currentNormal = shadowTriangles[i].normal;
+  //   currentReflectance = 1.f;
+  //
+  //   vertices[0].position = TM*shadowTriangles[i].v0 - cameraPos;
+  //   vertices[1].position = TM*shadowTriangles[i].v1 - cameraPos;
+  //   vertices[2].position = TM*shadowTriangles[i].v2 - cameraPos;
+  //
+  //
+  //   DrawPolygon(screen, vertices, shadowTriangles[i].color);
+  // }
+  //
+  //
+  // // clear stencil buffer;
+  // for(int x = 0; x < SCREEN_WIDTH; x++){
+  //   for(int y = 0; y < SCREEN_HEIGHT; y++){
+  //     depthBuffer[y][x] = 0;
+  //   }
+  // }
+  //
+  // zBufferAllowed = true;
+  // stencilTesting = true;
+  // for( uint32_t i=0; i<triangles.size(); ++i )
+  // {
+  //   vector<Vertex> vertices(3);
+  //
+  //   currentNormal = triangles[i].normal;
+  //   currentReflectance = 1.f;
+  //
+  //   vertices[0].position = TM*triangles[i].v0 - cameraPos;
+  //   vertices[1].position = TM*triangles[i].v1 - cameraPos;
+  //   vertices[2].position = TM*triangles[i].v2 - cameraPos;
+  //
+  //   DrawPolygon(screen, vertices, triangles[i].color);
+  // }
 }
 
 /*Place updates of parameters here*/
@@ -240,29 +288,61 @@ bool Update()
   return true;
 }
 
-void ComputeShadows(const vector<Vertex>& vertices){
-  lightPos = lightPos * glm::inverse(TM);
+void ComputeShadows(){
+  // vec4 newlightPos = lightPos * glm::inverse(TM);
+  vec4 newlightPos = TM*lightPos - cameraPos;
 
-  vec4 avgPolyPos = (vertices[0].position + vertices[1].position + vertices[2].position) / 3.0f;
-  vec4 lightDir = avgPolyPos - lightPos;
-  vector<Edge> polygonEdges;
+  for( uint32_t i=0; i<triangles.size(); ++i )
+  {
+    vector<Vertex> vertices(3);
 
-  for (uint i = 0; i < vertices.size(); ++i) {
-    // Take all edges of the polygon
-    Edge currentEdge;
-    currentEdge.v0 = vertices[i].position;
-    currentEdge.v1 = vertices[i+1 % vertices.size()].position;
+    currentNormal = triangles[i].normal;
 
-    polygonEdges.push_back(currentEdge);
-  }
+    vertices[0].position = TM*triangles[i].v0 - cameraPos;
+    vertices[1].position = TM*triangles[i].v1 - cameraPos;
+    vertices[2].position = TM*triangles[i].v2 - cameraPos;
 
-  if(glm::dot(lightDir, currentNormal) >= 0.0){
-    for(uint i = 0; i < polygonEdges.size(); i++){
-      contourEdges.push_back(polygonEdges[i]);
+    vec4 avgPolyPos = (vertices[0].position + vertices[1].position + vertices[2].position) / 3.0f;
+    vec4 lightDir = avgPolyPos - lightPos;
+    vector<Edge> polygonEdges;
+
+    for (uint i = 0; i < vertices.size(); ++i) {
+      // Take all edges of the polygon
+      Edge currentEdge;
+      currentEdge.v0 = vertices[i].position;
+      currentEdge.v1 = vertices[i+1 % vertices.size()].position;
+      polygonEdges.push_back(currentEdge);
+    }
+
+    if(glm::dot(lightDir, currentNormal) > 0.00001){
+      for(uint i = 0; i < polygonEdges.size(); i++){
+        vec4 triEdge1 = polygonEdges[i].v0;
+        vec4 triEdge2 = polygonEdges[i].v1;
+        int index;
+        bool edgeExists = false;
+
+        for(uint j = 0; j < contourEdges.size(); j++){
+          vec4 e1 = contourEdges[j].v0;
+          vec4 e2 = contourEdges[j].v1;
+
+          if( (triEdge1 == e1 && triEdge2 == e2) || (triEdge1 == e2 && triEdge2 == e1) ){
+            index = j;
+            edgeExists = true;
+            break;
+          }
+        }
+
+        if(edgeExists){
+            contourEdges.erase(contourEdges.begin()+index);
+        }
+        else{
+          contourEdges.push_back(polygonEdges[i]);
+        }
+      }
     }
   }
 
-  float extrudeMag = 100.0f;
+  float extrudeMag = 10.0f;
   for(uint i = 0; i < contourEdges.size(); i++){
     vec4 shadow_Tri1_v0 = contourEdges[i].v0;
     vec4 shadow_Tri1_v1 = contourEdges[i].v1;
@@ -274,7 +354,10 @@ void ComputeShadows(const vector<Vertex>& vertices){
 
     shadowTriangles.push_back(Triangle(shadow_Tri1_v0, shadow_Tri1_v1, shadow_Tri1_v2, vec3(1.0f, 0.0f, 0.0f)));
     shadowTriangles.push_back(Triangle(shadow_Tri2_v0, shadow_Tri2_v1, shadow_Tri2_v2, vec3(1.0f, 0.0f, 0.0f)));
+    // compute shadow triangles normals
   }
+
+  // printf("%d\n", shadowTriangles.size());
 }
 
 void ComputePolygonRows(const vector<Pixel>& vertexPixels,
@@ -375,17 +458,42 @@ void PixelShader(screen* screen, const Pixel& p, vec3 pixelOriginalColour )
   int x = p.x;
   int y = p.y;
 
+  //bool inShadow = true;
+
+  if(stencilTesting){
+    if(p.zinv > depthBuffer[y][x]){
+      stencilBuffer[y][x] ^= 1;
+    }
+  }
+
+  vec3 total;
   vec4 n = currentNormal;
   vec4 r = lightPos - p.pos3d;
   float rLength = length(r);
   float maxval = max(dot(r, n), 0.0f);
-  vec3 direct = (lightPower * maxval) / (4.0f * (float)M_PI * rLength * rLength);
-  vec3 total = currentReflectance * (direct + indirectLightPowerPerArea);
+
+  // if(zBufferAllowed){
+  //   total = currentReflectance * indirectLightPowerPerArea;
+  // }else{
+    vec3 direct = (lightPower * maxval) / (4.0f * (float)M_PI * rLength * rLength);
+    total = currentReflectance * (direct + indirectLightPowerPerArea);
+  // }
+
+  //render with ambient light only
+  // if( p.zinv > depthBuffer[y][x] ) {
+  //   depthBuffer[y][x] = p.zinv;
+  //   PutPixelSDL( screen, x, y, total * pixelOriginalColour );
+  // }
 
   if( p.zinv > depthBuffer[y][x] ) {
-      depthBuffer[y][x] = p.zinv;
-      PutPixelSDL( screen, x, y, total * pixelOriginalColour );
-    }
+    if(zBufferAllowed) depthBuffer[y][x] = p.zinv;
+    // if(stencilBuffer[y][x] == 0){
+      // if(!stencilTesting){
+        PutPixelSDL( screen, x, y, total * pixelOriginalColour);
+      // }
+    // }
+  }
+
 }
 
 void TransformationMatrix()
@@ -405,6 +513,20 @@ void VertexShader( const Vertex &v, Pixel& p )
   p.y = (focalLength * v.position.y * p.zinv) + (SCREEN_HEIGHT/2);
   p.pos3d = v.position;
 
+  // for(uint i = 0; i < shadowTriangles.size(); i++){
+  //   vec4 start(p.x, p.y, 0, 1.0);
+  //   vec4 rayDir(p.x - SCREEN_WIDTH/2, p.y - SCREEN_HEIGHT/2, focalLength, 1.0);
+  //
+  //
+  //   if(glm::dot(shadowTriangles[i].normal, rayDir) <= 0.0f){
+  //     stencilBuffer[p.y][p.x] += 1;
+  //   }
+  //   if(glm::dot(shadowTriangles[i].normal, rayDir) > 0.0f){
+  //     stencilBuffer[p.y][p.x] -= 1;
+  //   }
+  // }
+
+
   // vec4 n = v.normal;
   // vec4 r = lightPos - v.position;
   // float rLength = length(r);
@@ -412,6 +534,10 @@ void VertexShader( const Vertex &v, Pixel& p )
   // vec3 direct = (lightPower * maxval) / (4.0f * (float)M_PI * rLength * rLength);
   // vec3 total = v.reflectance * (direct + indirectLightPowerPerArea);
   // p.illumination = total;
+  if (p.y < 0) p.y = 0;
+  if (p.x < 0) p.x = 0;
+  if (p.y > SCREEN_HEIGHT) p.y = SCREEN_HEIGHT-1;
+  if (p.x > SCREEN_WIDTH) p.x = SCREEN_WIDTH-1;
 
   if(p.zinv > depthBuffer[p.y][p.x]){
     depthBuffer[p.y][p.x] = p.zinv;
@@ -525,7 +651,7 @@ bool loadOBJ(const char * path, vector <vec3> & out_vertices, vector <glm::vec2>
           printf("File can't be read by our simple parser : ( Try exporting with other options\n");
           return false;
       }
-      Triangle currentTriangle = Triangle(temp_vertices[vertexIndex[0]-1]/-6.0f, (temp_vertices[vertexIndex[1]-1]/-6.0f), temp_vertices[vertexIndex[2]-1]/-6.0f, vec3(1.0f, 0.0f, 1.0f ));
+      Triangle currentTriangle = Triangle(temp_vertices[vertexIndex[0]-1]/-6.0f, (temp_vertices[vertexIndex[1]-1]/-6.0f), temp_vertices[vertexIndex[2]-1]/-6.0f, vec3(1.0f, 1.0f, 1.0f ));
       currentTriangle.v0.z -= 1;
       currentTriangle.v1.z -= 1;
       currentTriangle.v2.z -= 1;
